@@ -12,7 +12,7 @@
       "input_token_cost": 2.1e-08,
       "output_token_cost": 6.16e-08,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -21,7 +21,7 @@
       "input_token_cost": 2.1e-08,
       "output_token_cost": 6.3e-08,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -39,7 +39,7 @@
       "input_token_cost": 1.4e-07,
       "output_token_cost": 2.8e-07,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -48,7 +48,7 @@
       "input_token_cost": 1e-07,
       "output_token_cost": 5e-07,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -57,7 +57,7 @@
       "input_token_cost": 1.5e-07,
       "output_token_cost": 6e-07,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -66,7 +66,7 @@
       "input_token_cost": 1.8e-07,
       "output_token_cost": 6e-07,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -75,7 +75,7 @@
       "input_token_cost": 2.32e-08,
       "output_token_cost": 1.2e-06,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -84,7 +84,7 @@
       "input_token_cost": 7.9e-08,
       "output_token_cost": 4.8e-06,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -93,7 +93,7 @@
       "input_token_cost": 2e-06,
       "output_token_cost": 1e-05,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
       "reasoning": true
     }
   ],
@@ -101,7 +101,7 @@
   "timeout_seconds": null,
   "supports_streaming": true,
   "requires_auth": true,
-  "catalog_provider_id": null,
+  "catalog_provider_id": "openrouter",
   "base_path": null,
   "env_vars": null,
   "dynamic_models": false,

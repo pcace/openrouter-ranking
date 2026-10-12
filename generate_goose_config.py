@@ -134,6 +134,14 @@ def build_index(models):
         aa = (m.get("benchmarks") or {}).get("artificial_analysis") or {}
         cid = canonical_id(mid)
         cost = prompt * PROMPT_TOKENS + completion * COMPLETION_TOKENS
+
+        def _num(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return 0.0
+
+        cache = _num(p.get("input_cache_read")) > 0 or _num(p.get("input_cache_write")) > 0
         entry = {
             "cid": cid,
             "id": mid, "api_name": m["name"], "context": m.get("context_length", 0),
@@ -142,6 +150,7 @@ def build_index(models):
             "tools": "tools" in (m.get("supported_parameters") or []),
             "reasoning": bool(m.get("reasoning")),
             "input_modalities": (m.get("architecture") or {}).get("input_modalities") or [],
+            "cache": cache,
             "is_variant": mid != cid,
         }
         prev = families.get(cid)
@@ -253,7 +262,7 @@ def provider_json(models):
                 "input_token_cost": m["prompt_cost"],
                 "output_token_cost": m["completion_cost"],
                 "currency": None,
-                "supports_cache_control": None,
+                "supports_cache_control": True if m["cache"] else None,
                 "reasoning": m["reasoning"],
             }
             for m in models
@@ -262,7 +271,7 @@ def provider_json(models):
         "timeout_seconds": None,
         "supports_streaming": True,
         "requires_auth": True,
-        "catalog_provider_id": None,
+        "catalog_provider_id": "openrouter",
         "base_path": None,
         "env_vars": None,
         "dynamic_models": False,
@@ -271,6 +280,15 @@ def provider_json(models):
         "setup_steps": [],
         "preserves_thinking": True,
     }
+
+
+MODALITY_TAG = {"image": "img", "video": "vid", "audio": "aud", "file": "pdf"}
+
+
+def modality_tags(m):
+    """Non-text input modalities, e.g. 'img+vid'."""
+    extra = [MODALITY_TAG.get(x, x) for x in m["input_modalities"] if x != "text"]
+    return "+".join(extra)
 
 
 def predefined_models(models, usage, total):
@@ -286,6 +304,9 @@ def predefined_models(models, usage, total):
         tokens = usage.get(m["cid"])
         if tokens:
             parts.append(f"{humanize_tokens(tokens)} tok/{USAGE_WINDOW_DAYS}d · {100 * tokens / total:.1f}%")
+        tags = modality_tags(m)
+        if tags:
+            parts.append(f"in: {tags}")
         out.append({
             "name": m["id"],
             "provider": PROVIDER_ID,
@@ -304,7 +325,7 @@ def write_readme(out_dir, selected, why, now, usage, total):
         tokens = usage.get(m["cid"])
         used = f"{humanize_tokens(tokens)} ({100 * tokens / total:.1f}%)" if tokens else "—"
         return (f"| `{m['id']}` | {alias} | ${m['cost_1m']:.2f} | {code} | "
-                f"{m['context']:,} | {used} | {why.get(m['id'], '')} |")
+                f"{m['context']:,} | {used} | {modality_tags(m) or 'text'} | {why.get(m['id'], '')} |")
 
     rows = "\n".join(row(m) for m in selected)
     readme = f"""# Goose config — OpenRouter coding models
@@ -313,8 +334,8 @@ Generated **{now}**. {len(selected)} models, selected from the live OpenRouter
 catalog by coding score, price and real usage. Token figures are the last
 {USAGE_WINDOW_DAYS} days (share of all OpenRouter traffic in the window).
 
-| Model | Name in picker | $/1M | Coding | Context | Tokens (7d) | Why |
-|-------|----------------|------|--------|---------|-------------|-----|
+| Model | Name in picker | $/1M | Coding | Context | Tokens (7d) | In | Why |
+|-------|----------------|------|--------|---------|-------------|----|-----|
 {rows}
 
 ## Install
