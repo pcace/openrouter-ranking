@@ -20,6 +20,8 @@ from datetime import datetime, timedelta, timezone
 
 MODELS_API = "https://openrouter.ai/api/v1/models"
 RANKINGS_API = "https://openrouter.ai/api/v1/datasets/rankings-daily"
+BENCHMARKS_API = "https://openrouter.ai/api/v1/benchmarks"
+APPS_API = "https://openrouter.ai/api/v1/datasets/app-rankings"
 PROMPT_TOKENS = 750_000
 COMPLETION_TOKENS = 250_000
 USAGE_WINDOW_DAYS = 7
@@ -131,13 +133,17 @@ def describe_key(key):
     return f"{len(key)} chars" + (f" — ⚠️ {', '.join(issues)}" if issues else " — ok")
 
 
-def fetch_models(api_key=None):
+def _get_json(url, api_key=None):
     headers = {"User-Agent": "openrouter-ranking/2.0"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    req = urllib.request.Request(MODELS_API, headers=headers)
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read())["data"]
+        return json.loads(resp.read())
+
+
+def fetch_models(api_key=None):
+    return _get_json(MODELS_API, api_key)["data"]
 
 
 def fetch_usage(api_key):
@@ -147,13 +153,7 @@ def fetch_usage(api_key):
     """
     end = datetime.now(timezone.utc).date()
     start = end - timedelta(days=USAGE_WINDOW_DAYS)
-    url = f"{RANKINGS_API}?start_date={start}&end_date={end}"
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "openrouter-ranking/2.0",
-        "Authorization": f"Bearer {api_key}",
-    })
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        rows = json.loads(resp.read())["data"]
+    rows = _get_json(f"{RANKINGS_API}?start_date={start}&end_date={end}", api_key)["data"]
 
     usage = {}
     for row in rows:
@@ -176,6 +176,31 @@ def match_usage_to_family(permaslug, models):
             if best is None or len(cid) > len(best):
                 best = cid
     return best
+
+
+def fetch_evals(api_key, models):
+    """OpenRouter's own evals (GPQA Diamond, tau-bench), keyed by model family.
+
+    Accuracy 0..1 per benchmark_type. Data: OpenRouter (openrouter.ai/rankings).
+    """
+    payload = _get_json(f"{BENCHMARKS_API}?source=openrouter", api_key)
+    families = {}
+    for item in payload["data"]:
+        cid = match_usage_to_family(item["model_permaslug"], models)
+        if not cid:
+            continue
+        bucket = families.setdefault(cid, {})
+        bt = item.get("benchmark_type")
+        prev = bucket.get(bt)
+        if prev is None or (item.get("accuracy") or 0) > (prev.get("accuracy") or 0):
+            bucket[bt] = item
+    return families, (payload.get("meta") or {}).get("citation")
+
+
+def fetch_app_rankings(api_key, sort="trending", limit=15):
+    """Top apps on OpenRouter by token usage / trend. CC BY 4.0 (openrouter.ai/apps)."""
+    payload = _get_json(f"{APPS_API}?sort={sort}&limit={limit}", api_key)
+    return payload["data"], (payload.get("meta") or {})
 
 
 def canonical_id(mid):
@@ -326,7 +351,57 @@ def render_usage_section(usage, models, top=15):
     return "\n".join(out)
 
 
-def build_readme(models, now, total_models, usage=None):
+EVAL_LABELS = {
+    "gpqa_diamond": ("GPQA Diamond", "graduate-level science Q&A"),
+    "tau_bench_verified_airline": ("tau-bench (airline)", "tool-calling agent tasks"),
+}
+
+
+def render_evals_section(families, citation, top=12):
+    blocks = []
+    for bt, (title, desc) in EVAL_LABELS.items():
+        rows = [(cid, e[bt]) for cid, e in families.items() if bt in e]
+        if len(rows) < 3:
+            continue
+        rows.sort(key=lambda kv: kv[1].get("accuracy") or 0, reverse=True)
+        lines = [f"### {title}", f"_{desc} — accuracy, higher is better_", "",
+                 "| # | Model | Accuracy | $/task | Runs |", "|---|-------|----------|--------|------|"]
+        for i, (cid, item) in enumerate(rows[:top], 1):
+            acc = item.get("accuracy")
+            cost = item.get("avg_cost_per_task")
+            lines.append(
+                f"| {i} | `{cid}` | {acc * 100:.1f}% | "
+                f"{'$%.4f' % cost if cost is not None else '—'} | {item.get('total_tasks', '—')} |"
+            )
+        lines.append("")
+        blocks.append("\n".join(lines))
+    if not blocks:
+        return None
+    head = ["## 🧪 OpenRouter Evals", "",
+            "_OpenRouter's own evaluations — knowledge/reasoning and tool-calling accuracy._", ""]
+    if citation:
+        head += [f"> {citation}", ""]
+    return "\n".join(head).rstrip() + "\n\n" + "\n".join(blocks)
+
+
+def render_apps_section(apps, meta, top=15):
+    if not apps:
+        return None
+    lines = ["## 🚀 Trending Apps", "",
+             "_Fastest-growing apps on OpenRouter by token growth vs. prior windows._", "",
+             "| # | App | Tokens | Requests |", "|---|-----|--------|----------|"]
+    for a in apps[:top]:
+        lines.append(
+            f"| {a['rank']} | {a['app_name']} | {int(a['total_tokens']):,} | {int(a['total_requests']):,} |"
+        )
+    lines.append("")
+    if meta.get("as_of"):
+        lines += [f"*Source: OpenRouter (openrouter.ai/apps), as of {meta['as_of']} — CC BY 4.0.*", ""]
+    return "\n".join(lines)
+
+
+def build_readme(models, now, total_models, usage=None, evals=None, evals_citation=None,
+                 apps=None, apps_meta=None):
     scored = sum(1 for m in models.values() if m["intelligence"] is not None)
     sections = [render_top_overall(models)]
     if usage:
@@ -337,6 +412,15 @@ def build_readme(models, now, total_models, usage=None):
         ranked = rank(models, cat)
         if ranked:
             sections.append(render_table(cat, ranked, models))
+
+    if evals:
+        section = render_evals_section(evals, evals_citation)
+        if section:
+            sections.append(section)
+    if apps:
+        section = render_apps_section(apps, apps_meta or {})
+        if section:
+            sections.append(section)
 
     return f"""# 🏆 OpenRouter LLM Cost-Effectiveness Ranking
 
@@ -411,17 +495,29 @@ def main():
     print(f"✅ {len(data)} models → {len(models)} priced families", file=sys.stderr)
 
     usage = None
+    evals = evals_citation = apps = apps_meta = None
     if args.api_key:
         try:
             usage = fetch_usage(args.api_key)
             print(f"✅ Usage data: {len(usage)} models over {USAGE_WINDOW_DAYS} days", file=sys.stderr)
         except Exception as e:
             print(f"⚠️  Usage section skipped ({e})", file=sys.stderr)
+        try:
+            evals, evals_citation = fetch_evals(args.api_key, models)
+            print(f"✅ Evals: {len(evals)} models", file=sys.stderr)
+        except Exception as e:
+            print(f"⚠️  Evals section skipped ({e})", file=sys.stderr)
+        try:
+            apps, apps_meta = fetch_app_rankings(args.api_key)
+            print(f"✅ Trending apps: {len(apps)}", file=sys.stderr)
+        except Exception as e:
+            print(f"⚠️  Trending apps section skipped ({e})", file=sys.stderr)
     else:
-        print("ℹ️  No API key → skipping usage section (set OPENROUTER_API_KEY)", file=sys.stderr)
+        print("ℹ️  No API key → skipping usage, evals and trending sections "
+              "(set OPENROUTER_API_KEY)", file=sys.stderr)
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    readme = build_readme(models, now, len(data), usage)
+    readme = build_readme(models, now, len(data), usage, evals, evals_citation, apps, apps_meta)
     with open(args.output, "w") as f:
         f.write(readme)
     print(f"✅ Written to {args.output}", file=sys.stderr)

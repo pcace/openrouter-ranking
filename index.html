@@ -276,7 +276,7 @@
       Draxo.io
     </a>
     <ul class="nav-links">
-      <li><a href="https://github.com/Draxo-io/openrouter-ranking">GitHub</a></li>
+      <li><a id="repo-link" href="https://github.com/Draxo-io/openrouter-ranking">GitHub</a></li>
       <li><a href="https://openrouter.ai">OpenRouter</a></li>
       <li><a href="https://draxo.io" class="nav-cta">draxo.io →</a></li>
     </ul>
@@ -382,7 +382,7 @@
 
 <footer>
   <div class="container">
-    <p>Open source · <a href="https://github.com/Draxo-io/openrouter-ranking">Draxo-io/openrouter-ranking</a></p>
+    <p>Open source · <a id="repo-link-footer" href="https://github.com/Draxo-io/openrouter-ranking">Draxo-io/openrouter-ranking</a></p>
     <div class="footer-links">
       <a href="https://draxo.io">draxo.io</a>
       <a href="https://github.com/Draxo-io">GitHub</a>
@@ -393,23 +393,37 @@
 
 <script>
 (async function() {
+  // Resolve this fork's repo so the page loads its own README, not upstream's.
+  // On GitHub Pages the owner/repo come from the URL; otherwise fall back to the fork.
+  const REPO = /\.github\.io$/.test(location.hostname)
+    ? location.hostname.split('.')[0] + '/' + (location.pathname.split('/').filter(Boolean)[0] || '')
+    : 'pcace/openrouter-ranking';
+  const repoUrl = 'https://github.com/' + REPO;
+  document.querySelectorAll('#repo-link, #repo-link-footer').forEach(function(a) {
+    a.href = repoUrl;
+    if (a.id === 'repo-link-footer') a.textContent = REPO;
+  });
+
   try {
-    const resp = await fetch('https://raw.githubusercontent.com/Draxo-io/openrouter-ranking/main/README.md');
+    const resp = await fetch(`https://raw.githubusercontent.com/${REPO}/main/README.md`);
     const md = await resp.text();
     const html = markdownToHTML(md);
     document.getElementById('ranking-content').innerHTML = html;
   } catch(e) {
     document.getElementById('ranking-content').innerHTML =
-      '<section class="category" style="text-align:center;padding:40px;"><p style="color:var(--red);">⚠️ Could not load ranking. <a href="https://github.com/Draxo-io/openrouter-ranking">View on GitHub</a></p></section>';
+      '<section class="category" style="text-align:center;padding:40px;"><p style="color:var(--red);">⚠️ Could not load ranking. <a href="' + repoUrl + '">View on GitHub</a></p></section>';
   }
 })();
 
 function markdownToHTML(md) {
   let html = md;
-  // Strip the header / badges / about section — we already have those
-  const cutoff = html.indexOf('## 💬');
-  if (cutoff === -1) return html;
-  html = html.substring(cutoff);
+  // Start at the first data section (Top Picks) — the hero/about already exist above.
+  let start = html.indexOf('## 🏆');
+  if (start === -1) { const m = html.match(/^## /m); start = m ? m.index : 0; }
+  html = html.substring(start);
+  // Drop the generated footer sections — the page has its own methodology/about.
+  const tail = html.indexOf('## 🔧');
+  if (tail !== -1) html = html.substring(0, tail);
 
   // Headers
   html = html.replace(/^### (.+)$/gm, '<h3 style="margin-top:24px;">$1</h3>');

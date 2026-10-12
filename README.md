@@ -1,6 +1,6 @@
 # 🏆 OpenRouter LLM Cost-Effectiveness Ranking
 
-> **Updated:** 2026-10-12 10:09 UTC
+> **Updated:** 2026-10-12 10:15 UTC
 > **Models on OpenRouter:** 458 · **Families priced:** 338 · **With benchmark scores:** 211
 > **Methodology:** value = benchmark index ÷ blended price per 1M tokens (750K prompt + 250K completion). Data via [OpenRouter API](https://openrouter.ai/api/v1/models).
 
@@ -193,6 +193,78 @@ _Cheapest models that still score ≥ 20 on intelligence_
 
 ---
 
+## 🧪 OpenRouter Evals
+
+_OpenRouter's own evaluations — knowledge/reasoning and tool-calling accuracy._
+
+> Source: OpenRouter evals (openrouter.ai) via OpenRouter (openrouter.ai/rankings).
+
+### GPQA Diamond
+_graduate-level science Q&A — accuracy, higher is better_
+
+| # | Model | Accuracy | $/task | Runs |
+|---|-------|----------|--------|------|
+| 1 | `google/gemini-3.8-flash` | 95.6% | $0.0682 | 191 |
+| 2 | `openai/gpt-6-astra-pro` | 95.5% | $0.3326 | 198 |
+| 3 | `sakana/fugu-ultra` | 94.6% | $1.1487 | 198 |
+| 4 | `google/gemini-3.1-pro-preview` | 94.5% | $0.2020 | 396 |
+| 5 | `openai/gpt-6-astra` | 94.4% | $0.1133 | 198 |
+| 6 | `openai/gpt-6.1-sol` | 94.4% | $0.0214 | 198 |
+| 7 | `openai/gpt-5.6-sol-pro` | 93.9% | $0.2979 | 396 |
+| 8 | `google/gemini-3.7-flash` | 93.9% | $0.0293 | 385 |
+| 9 | `openai/gpt-5.5` | 93.7% | $0.3093 | 594 |
+| 10 | `sakana/fugu-ultra-v2` | 93.3% | $0.5026 | 198 |
+| 11 | `x-ai/grok-4.6` | 92.8% | $0.1233 | 396 |
+| 12 | `google/gemini-3.6-flash` | 92.6% | $0.0596 | 594 |
+
+### tau-bench (airline)
+_tool-calling agent tasks — accuracy, higher is better_
+
+| # | Model | Accuracy | $/task | Runs |
+|---|-------|----------|--------|------|
+| 1 | `xiaomi/mimo-v2.6-flash` | 79.7% | $0.0173 | 100 |
+| 2 | `anthropic/claude-fable-5.1` | 79.2% | $0.7162 | 200 |
+| 3 | `anthropic/claude-opus-5` | 78.7% | $0.4871 | 500 |
+| 4 | `google/gemini-3.7-flash` | 78.5% | $0.1149 | 96 |
+| 5 | `amazon/nova-micro-v1` | 78.0% | $1.2758 | 150 |
+| 6 | `anthropic/claude-sonnet-5.5` | 78.0% | $0.1563 | 100 |
+| 7 | `qwen/qwen3.8-27b` | 77.6% | $0.0758 | 350 |
+| 8 | `deepseek/deepseek-v4-pro` | 77.4% | $0.1051 | 400 |
+| 9 | `stepfun/step-3.7-flash` | 77.3% | $0.0201 | 50 |
+| 10 | `qwen/qwen3.5-397b-a17b` | 77.2% | $0.1748 | 400 |
+| 11 | `openai/gpt-5.1` | 77.1% | $0.4149 | 150 |
+| 12 | `z-ai/glm-5.3` | 76.9% | $0.0619 | 300 |
+
+
+---
+
+## 🚀 Trending Apps
+
+_Fastest-growing apps on OpenRouter by token growth vs. prior windows._
+
+| # | App | Tokens | Requests |
+|---|-----|--------|----------|
+| 1 | Claude Code | 30,679,975,933,614 | 305,297,469 |
+| 2 | Cline | 19,535,292,351,875 | 156,509,681 |
+| 3 | Hermes Agent | 51,580,640,357,392 | 505,409,763 |
+| 4 | Kilo Code | 22,264,637,743,257 | 266,153,612 |
+| 5 | Codex | 11,637,868,014,881 | 145,845,329 |
+| 6 | pi | 11,970,333,447,469 | 110,287,437 |
+| 7 | omp | 10,197,171,380,901 | 67,872,723 |
+| 8 | Freebuff | 8,271,861,148,116 | 63,201,910 |
+| 9 | DeepSeek Harness | 5,847,442,746,724 | 39,324,526 |
+| 10 | Command Code | 4,180,050,397,423 | 46,706,274 |
+| 11 | OpenHands | 3,096,103,746,053 | 31,942,997 |
+| 12 | OpenClaw | 6,175,105,902,946 | 78,715,803 |
+| 13 | Strix | 1,682,790,601,129 | 13,970,582 |
+| 14 | CodeGPT | 1,254,797,112,408 | 8,958,727 |
+| 15 | ZCode | 1,892,557,200,522 | 10,010,227 |
+
+*Source: OpenRouter (openrouter.ai/apps), as of 2026-10-12T10:15:02.967Z — CC BY 4.0.*
+
+
+---
+
 ## 🔧 Methodology
 
 - **Source:** [OpenRouter API](https://openrouter.ai/api/v1/models) — live catalog incl. benchmark scores
@@ -206,7 +278,7 @@ _Cheapest models that still score ≥ 20 on intelligence_
 
 ---
 
-*Data source: OpenRouter (openrouter.ai). Usage figures from openrouter.ai/rankings (CC BY 4.0, as of 2026-10-12 10:09 UTC). Fork of Draxo-io/openrouter-ranking.*
+*Data source: OpenRouter (openrouter.ai). Usage figures from openrouter.ai/rankings (CC BY 4.0, as of 2026-10-12 10:15 UTC). Fork of Draxo-io/openrouter-ranking.*
 
 ---
 
