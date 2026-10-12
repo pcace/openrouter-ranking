@@ -135,6 +135,7 @@ def build_index(models):
         cid = canonical_id(mid)
         cost = prompt * PROMPT_TOKENS + completion * COMPLETION_TOKENS
         entry = {
+            "cid": cid,
             "id": mid, "api_name": m["name"], "context": m.get("context_length", 0),
             "prompt_cost": prompt, "completion_cost": completion, "cost_1m": cost,
             "coding": aa.get("coding_index"), "intelligence": aa.get("intelligence_index"),
@@ -151,25 +152,41 @@ def build_index(models):
     return families
 
 
-def fetch_usage_share(api_key, models):
+def fetch_usage(api_key, models):
+    """Returns ({family_id: tokens}, grand_total) over the usage window.
+
+    The dataset lists the top-50 models per day plus an aggregated ``other`` row,
+    so the grand total (including ``other``) is the right denominator for a share.
+    """
     end = datetime.now(timezone.utc).date()
     start = end - timedelta(days=USAGE_WINDOW_DAYS)
     try:
         rows = _get_json(f"{RANKINGS_API}?start_date={start}&end_date={end}", api_key)["data"]
     except Exception as e:
         print(f"⚠️  Usage data unavailable ({e}); picking without popularity", file=sys.stderr)
-        return {}
-    usage = {}
+        return {}, 0
+    usage, total = {}, 0
     for row in rows:
+        tokens = int(row["total_tokens"])
+        total += tokens
+        if row["model_permaslug"] == "other":
+            continue
         slug = row["model_permaslug"].split(":", 1)[0]
-        best = None
-        for cid in models:
-            if slug.startswith(cid) or cid.startswith(slug):
-                if best is None or len(cid) > len(best):
-                    best = cid
+        best = max((cid for cid in models if slug.startswith(cid) or cid.startswith(slug)),
+                   key=len, default=None)
         if best:
-            usage[best] = usage.get(best, 0) + int(row["total_tokens"])
-    return usage
+            usage[best] = usage.get(best, 0) + tokens
+    return usage, total
+
+
+def humanize_tokens(n):
+    if n >= 1e12:
+        return f"{n / 1e12:.1f}T"
+    if n >= 1e9:
+        return f"{n / 1e9:.1f}B"
+    if n >= 1e6:
+        return f"{n / 1e6:.0f}M"
+    return str(n)
 
 
 def select(models, usage):
@@ -212,9 +229,9 @@ def select(models, usage):
     if premium:
         take(max(premium, key=score), f"best quality under ${PREMIUM_MAX:.0f}/1M", diversify=False)
 
-    for m in sorted((m for m in pool if m["id"] in usage),
-                    key=lambda m: usage[m["id"]], reverse=True)[:3]:
-        take(m, "widely used on OpenRouter")
+    for m in sorted((m for m in pool if m["cid"] in usage),
+                    key=lambda m: usage[m["cid"]], reverse=True)[:3]:
+        take(m, f"widely used ({humanize_tokens(usage[m['cid']])} tok/7d)")
 
     take(max(pool, key=value), "best overall coding value", diversify=False)
 
@@ -256,14 +273,19 @@ def provider_json(models):
     }
 
 
-def predefined_models(models):
+def predefined_models(models, usage, total):
     out = []
     for m in models:
         parts = [f"${m['cost_1m']:.2f}/1M", f"{fmt_ctx(m['context'])} ctx"]
         if m["coding"] is not None:
             parts.append(f"code {m['coding']:.0f}")
+        elif m["intelligence"] is not None:
+            parts.append(f"iq {m['intelligence']:.0f}")
         else:
-            parts.append(f"iq {m['intelligence']:.0f}" if m["intelligence"] is not None else "unrated")
+            parts.append("unrated")
+        tokens = usage.get(m["cid"])
+        if tokens:
+            parts.append(f"{humanize_tokens(tokens)} tok/{USAGE_WINDOW_DAYS}d · {100 * tokens / total:.1f}%")
         out.append({
             "name": m["id"],
             "provider": PROVIDER_ID,
@@ -275,22 +297,24 @@ def predefined_models(models):
     return out
 
 
-def write_readme(out_dir, selected, why, now):
-    rows = "\n".join(
-        f"| `{m['id']}` | {pretty_alias(m['id'], m['api_name'])} | ${m['cost_1m']:.2f} | "
-        f"{m['coding']:.0f} | {m['context']:,} | {why.get(m['id'], '')} |"
-        if m["coding"] is not None else
-        f"| `{m['id']}` | {pretty_alias(m['id'], m['api_name'])} | ${m['cost_1m']:.2f} | "
-        f"n/a | {m['context']:,} | {why.get(m['id'], '')} |"
-        for m in selected
-    )
+def write_readme(out_dir, selected, why, now, usage, total):
+    def row(m):
+        alias = pretty_alias(m["id"], m["api_name"])
+        code = f"{m['coding']:.0f}" if m["coding"] is not None else "n/a"
+        tokens = usage.get(m["cid"])
+        used = f"{humanize_tokens(tokens)} ({100 * tokens / total:.1f}%)" if tokens else "—"
+        return (f"| `{m['id']}` | {alias} | ${m['cost_1m']:.2f} | {code} | "
+                f"{m['context']:,} | {used} | {why.get(m['id'], '')} |")
+
+    rows = "\n".join(row(m) for m in selected)
     readme = f"""# Goose config — OpenRouter coding models
 
 Generated **{now}**. {len(selected)} models, selected from the live OpenRouter
-catalog by coding score, price and real usage.
+catalog by coding score, price and real usage. Token figures are the last
+{USAGE_WINDOW_DAYS} days (share of all OpenRouter traffic in the window).
 
-| Model | Name in picker | $/1M | Coding | Context | Why |
-|-------|----------------|------|--------|---------|-----|
+| Model | Name in picker | $/1M | Coding | Context | Tokens (7d) | Why |
+|-------|----------------|------|--------|---------|-------------|-----|
 {rows}
 
 ## Install
@@ -329,7 +353,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     print("🔄 Fetching OpenRouter catalog…", file=sys.stderr)
     models = build_index(_get_json(MODELS_API)["data"])
-    usage = fetch_usage_share(args.api_key, models) if args.api_key else {}
+    usage, total = fetch_usage(args.api_key, models) if args.api_key else ({}, 0)
     selected, why = select(models, usage)
     print(f"✅ {len(selected)} models selected: {', '.join(m['id'] for m in selected)}", file=sys.stderr)
 
@@ -337,7 +361,7 @@ def main():
         json.dump(provider_json(selected), f, indent=2)
         f.write("\n")
 
-    pre = predefined_models(selected)
+    pre = predefined_models(selected, usage, total)
     with open(os.path.join(args.out, "predefined_models.json"), "w") as f:
         json.dump(pre, f, indent=2)
         f.write("\n")
@@ -355,7 +379,7 @@ def main():
         f.write(snippet)
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    write_readme(args.out, selected, why, now)
+    write_readme(args.out, selected, why, now, usage, total)
     print(f"✅ Wrote {args.out}/ (provider, predefined models, snippet, README)", file=sys.stderr)
 
 
