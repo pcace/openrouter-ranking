@@ -141,14 +141,24 @@ DESK
     ;;
 esac
 
+# Shell profile: so terminals that launch Goose see the variable too.
+for _f in "$HOME/.zshrc" "$HOME/.bashrc"; do
+  if [ -f "$_f" ]; then
+    SHELLRC="$_f"
+    break
+  fi
+done
+if [ -n "${SHELLRC:-}" ] && ! grep -qF "GOOSE_PREDEFINED_MODELS" "$SHELLRC"; then
+  printf '\n# Goose: curated OpenRouter models with prices (auto-updated)\nexport GOOSE_PREDEFINED_MODELS="$(cat %s)"\n' "$MIN" >> "$SHELLRC"
+  echo "✓ export added to $SHELLRC"
+fi
+
 cat <<EOF
 
-Model names + prices are enabled via GOOSE_PREDEFINED_MODELS. For terminals,
-add this to ~/.bashrc (or ~/.zshrc):
+Model names + prices are enabled via GOOSE_PREDEFINED_MODELS.
+Then fully quit and restart Goose (via the desktop launcher).
 
-  $EXPORT_LINE
-
-Then fully quit and restart Goose. The API key is read from Goose's keyring
-under OPENROUTER_API_KEY (the same secret the wigolo extension already uses).
+The API key is read from Goose's keyring under OPENROUTER_API_KEY —
+add it on this machine; keys are never shipped with these files.
 EOF
 
