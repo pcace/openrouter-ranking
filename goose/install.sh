@@ -48,6 +48,14 @@ case "$(uname -s)" in
     # The wrapper also refreshes the model list from the repo on every launch.
     if [ -f /usr/share/applications/goose.desktop ]; then
       WRAPPER="$GOOSE_DIR/launch-goose-with-models.sh"
+      GOOSE_BIN_RESOLVED="$(command -v goose 2>/dev/null || true)"
+      if [ -z "$GOOSE_BIN_RESOLVED" ]; then
+        for _c in /usr/lib/goose/Goose /opt/homebrew/bin/goose /usr/local/bin/goose \
+                  "/Applications/Goose.app/Contents/MacOS/Goose"; do
+          [ -x "$_c" ] && { GOOSE_BIN_RESOLVED="$_c"; break; }
+        done
+      fi
+      echo "✓ goose binary: ${GOOSE_BIN_RESOLVED:-NICHT GEFUNDEN}"
       mkdir -p "$HOME/.local/share/applications"
       cat > "$WRAPPER" <<WRAP
 #!/usr/bin/env bash
@@ -61,7 +69,12 @@ REPO_RAW="https://raw.githubusercontent.com/pcace/openrouter-ranking/main/goose"
 LOCAL_REPO="$REPO_DIR"
 GOOSE_CFG="\${GOOSE_CONFIG_DIR:-\$HOME/.config/goose}"
 CACHE="\${XDG_CACHE_HOME:-\$HOME/.cache}/goose-openrouter"
-GOOSE_BIN="\${GOOSE_BIN:-/usr/lib/goose/Goose}"
+GOOSE_BIN="\${GOOSE_BIN:-$GOOSE_BIN_RESOLVED}"
+
+if [ -z "\$GOOSE_BIN" ]; then
+  echo "✗ goose binary nicht gefunden — bitte GOOSE_BIN setzen"
+  exit 1
+fi
 
 mkdir -p "\$CACHE" "\$GOOSE_CFG/custom_providers"
 

@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 
 MODELS_API = "https://openrouter.ai/api/v1/models"
 RANKINGS_API = "https://openrouter.ai/api/v1/datasets/rankings-daily"
+REPO_RAW_URL = "https://raw.githubusercontent.com/pcace/openrouter-ranking/main/goose"
 
 PROVIDER_ID = "openrouter_code"
 PROVIDER_DISPLAY = "OpenRouter · Code"
@@ -338,24 +339,37 @@ catalog by coding score, price and real usage. Token figures are the last
 |-------|----------------|------|--------|---------|-------------|----|-----|
 {rows}
 
-## Install
+## Setup — new machine
+
+One command, no repo clone needed (Linux/macOS):
+
+```bash
+curl -fsSL {REPO_RAW_URL}/bootstrap.sh -o bootstrap.sh && bash bootstrap.sh
+```
+
+This installs the provider, merges the `providers:` entry (with backup), writes a
+self-updating launcher (`.desktop` on Linux, `launchctl` on macOS) and adds
+`GOOSE_PREDEFINED_MODELS` to your shell profile.
+
+**Start Goose afterwards via the desktop launcher** so the wrapper applies —
+the launcher re-downloads the latest model list on *every* start.
+
+Then add the `{API_KEY_ENV}` secret in Goose (Settings → provider, or
+`goose configure`) — keys are never part of these files.
+
+## Setup — from a local clone
 
 ```bash
 ./goose/install.sh            # copies provider + patches config.yaml (with backup)
 ```
 
-Then make the picker show names + prices. The desktop app reads
-GOOSE_PREDEFINED_MODELS from its environment, so it must be set before launch:
+## Update
 
-  export GOOSE_PREDEFINED_MODELS="$(cat ~/git/openrouter-ranking/goose/predefined_models.min.json)"
-
-The API key is read from the `{API_KEY_ENV}` secret in Goose's keyring
-(`goose configure` → your provider), same as any other OpenRouter setup.
-
-## Update weekly
+Nothing to do: the launcher pulls the latest list on every Goose start, and the
+GitHub Action regenerates it weekly (Monday 12:00 UTC). To force it:
 
 ```bash
-cd ~/git/openrouter-ranking && git pull && ./goose/install.sh
+bash "$HOME/.config/goose/launch-goose-with-models.sh"
 ```
 """
     with open(os.path.join(out_dir, "README.md"), "w") as f:

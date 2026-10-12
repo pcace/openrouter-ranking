@@ -34,6 +34,15 @@
       "reasoning": true
     },
     {
+      "name": "xiaomi/mimo-v2.6-flash",
+      "context_limit": 1050000,
+      "input_token_cost": 1.4e-07,
+      "output_token_cost": 2.8e-07,
+      "currency": null,
+      "supports_cache_control": true,
+      "reasoning": true
+    },
+    {
       "name": "anthropic/claude-haiku-5.5",
       "context_limit": 1000000,
       "input_token_cost": 1e-07,
