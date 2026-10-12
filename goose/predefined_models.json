@@ -19,23 +19,15 @@
     "name": "openai/gpt-oss-120b",
     "provider": "openrouter_code",
     "alias": "OpenAI GPT OSS 120b",
-    "subtext": "$0.07/1M \u00b7 131K ctx \u00b7 code 30 \u00b7 419.8B tok/7d \u00b7 0.2%",
+    "subtext": "$0.07/1M \u00b7 131K ctx \u00b7 code 30",
     "context_limit": 131072,
-    "reasoning": true
-  },
-  {
-    "name": "xiaomi/mimo-v2.6-flash",
-    "provider": "openrouter_code",
-    "alias": "MiMo V2.6 Flash",
-    "subtext": "$0.18/1M \u00b7 1.1M ctx \u00b7 iq 38 \u00b7 11.5T tok/7d \u00b7 6.7% \u00b7 in: img+vid+aud",
-    "context_limit": 1050000,
     "reasoning": true
   },
   {
     "name": "anthropic/claude-haiku-5.5",
     "provider": "openrouter_code",
     "alias": "Claude Haiku 5.5",
-    "subtext": "$0.20/1M \u00b7 1M ctx \u00b7 iq 43 \u00b7 1.1T tok/7d \u00b7 0.6% \u00b7 in: img+pdf",
+    "subtext": "$0.20/1M \u00b7 1M ctx \u00b7 iq 43 \u00b7 in: img+pdf",
     "context_limit": 1000000,
     "reasoning": true
   },
@@ -43,7 +35,7 @@
     "name": "deepseek/deepseek-v4.1-flash",
     "provider": "openrouter_code",
     "alias": "DeepSeek V4.1 Flash",
-    "subtext": "$0.26/1M \u00b7 1M ctx \u00b7 iq 40 \u00b7 41.0T tok/7d \u00b7 23.8% \u00b7 in: img",
+    "subtext": "$0.26/1M \u00b7 1M ctx \u00b7 iq 40 \u00b7 in: img",
     "context_limit": 1048576,
     "reasoning": true
   },
@@ -59,7 +51,7 @@
     "name": "z-ai/glm-5.3-flash",
     "provider": "openrouter_code",
     "alias": "GLM 5.3 Flash",
-    "subtext": "$0.32/1M \u00b7 1M ctx \u00b7 code 72 \u00b7 12.2T tok/7d \u00b7 7.1% \u00b7 in: img+vid",
+    "subtext": "$0.32/1M \u00b7 1M ctx \u00b7 code 72 \u00b7 in: img+vid",
     "context_limit": 1048576,
     "reasoning": true
   },
@@ -67,7 +59,7 @@
     "name": "z-ai/glm-5.3",
     "provider": "openrouter_code",
     "alias": "GLM 5.3",
-    "subtext": "$1.26/1M \u00b7 1M ctx \u00b7 code 75 \u00b7 3.8T tok/7d \u00b7 2.2%",
+    "subtext": "$1.27/1M \u00b7 1M ctx \u00b7 code 75",
     "context_limit": 1048576,
     "reasoning": true
   },
@@ -75,7 +67,7 @@
     "name": "openai/gpt-5.6-sol",
     "provider": "openrouter_code",
     "alias": "OpenAI GPT 5.6 Sol",
-    "subtext": "$4.00/1M \u00b7 1.1M ctx \u00b7 code 77 \u00b7 1.6T tok/7d \u00b7 0.9% \u00b7 in: pdf+img",
+    "subtext": "$4.00/1M \u00b7 1.1M ctx \u00b7 code 77 \u00b7 in: pdf+img",
     "context_limit": 1050000,
     "reasoning": true
   }

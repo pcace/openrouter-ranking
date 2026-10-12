@@ -1,6 +1,6 @@
 # 🏆 OpenRouter LLM Cost-Effectiveness Ranking
 
-> **Updated:** 2026-10-12 10:15 UTC
+> **Updated:** 2026-10-12 12:22 UTC
 > **Models on OpenRouter:** 458 · **Families priced:** 338 · **With benchmark scores:** 211
 > **Methodology:** value = benchmark index ÷ blended price per 1M tokens (750K prompt + 250K completion). Data via [OpenRouter API](https://openrouter.ai/api/v1/models).
 
@@ -260,7 +260,7 @@ _Fastest-growing apps on OpenRouter by token growth vs. prior windows._
 | 14 | CodeGPT | 1,254,797,112,408 | 8,958,727 |
 | 15 | ZCode | 1,892,557,200,522 | 10,010,227 |
 
-*Source: OpenRouter (openrouter.ai/apps), as of 2026-10-12T10:15:02.967Z — CC BY 4.0.*
+*Source: OpenRouter (openrouter.ai/apps), as of 2026-10-12T12:22:56.502Z — CC BY 4.0.*
 
 
 ---
@@ -278,7 +278,7 @@ _Fastest-growing apps on OpenRouter by token growth vs. prior windows._
 
 ---
 
-*Data source: OpenRouter (openrouter.ai). Usage figures from openrouter.ai/rankings (CC BY 4.0, as of 2026-10-12 10:15 UTC). Fork of Draxo-io/openrouter-ranking.*
+*Data source: OpenRouter (openrouter.ai). Usage figures from openrouter.ai/rankings (CC BY 4.0, as of 2026-10-12 12:22 UTC). Fork of Draxo-io/openrouter-ranking.*
 
 ---
 
