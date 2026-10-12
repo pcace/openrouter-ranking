@@ -102,6 +102,35 @@ def load_env_file(path=".env"):
             os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+def clean_api_key(raw):
+    """Normalize a key pasted from a secret/env.
+
+    GitHub secrets and hand-edited .env files routinely carry a trailing newline
+    or surrounding quotes, which makes urllib reject the header with
+    `ValueError: Invalid header value`. Strip all of that and keep only the first
+    line, so a multiline paste can't break the request.
+    """
+    if not raw:
+        return None
+    key = raw.strip()
+    if not key:
+        return None
+    key = key.splitlines()[0].strip().strip('"').strip("'").strip()
+    return key or None
+
+
+def describe_key(key):
+    """Non-sensitive fingerprint of a key, for logging."""
+    issues = []
+    if not key.startswith("sk-or-"):
+        issues.append("unexpected prefix (expected 'sk-or-')")
+    if any(ord(c) > 127 for c in key):
+        issues.append("non-ASCII characters")
+    if any(c.isspace() for c in key):
+        issues.append("internal whitespace")
+    return f"{len(key)} chars" + (f" — ⚠️ {', '.join(issues)}" if issues else " — ok")
+
+
 def fetch_models(api_key=None):
     headers = {"User-Agent": "openrouter-ranking/2.0"}
     if api_key:
@@ -370,6 +399,11 @@ def main():
     ap.add_argument("--api-key", default=os.environ.get("OPENROUTER_API_KEY"),
                     help="or set OPENROUTER_API_KEY; only needed for the usage section")
     args = ap.parse_args()
+    api_key = clean_api_key(args.api_key)
+    args.api_key = api_key
+
+    if api_key:
+        print(f"🔑 API key accepted ({describe_key(api_key)})", file=sys.stderr)
 
     print("🔄 Fetching live catalog from OpenRouter…", file=sys.stderr)
     data = fetch_models(args.api_key)
