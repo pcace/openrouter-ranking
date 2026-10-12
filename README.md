@@ -41,7 +41,7 @@ _Real OpenRouter traffic — what is actually being run, not what is best value.
 
 | # | Model | Share | $/1M | Intelligence |
 |---|-------|-------|------|--------------|
-| 1 | `deepseek/deepseek-v4.1-flash-20260910` | 25.5% | $0.262 | 39.5 |
+| 1 | `deepseek/deepseek-v4.1-flash-20260910` | 25.5% | $0.525 | 39.5 |
 | 2 | `z-ai/glm-5.3-flash-20260826` | 7.6% | $0.317 | 41.8 |
 | 3 | `xiaomi/mimo-v2.6-flash-20260921` | 7.1% | $0.175 | 37.9 |
 | 4 | `stepfun/step-5-preview-20261008` | 5.5% | $1.425 | — |
@@ -69,11 +69,11 @@ _Everyday chat, Q&A, summaries, translation_
 | ⭐ 2 | `xiaomi/mimo-v2.6-flash` | 🟡 $0.175 | 37.9 | 217 | 1,050,000 | text+image+video+audio |
 | ⭐ 3 | `deepseek/deepseek-v4-flash-0731` | 🟡 $0.172 | 34.3 | 199 | 1,048,576 | text |
 | 4 | `openai/gpt-6-luna` | 🟡 $0.200 | 38.1 | 190 | 1,050,000 | file+image+text |
-| 5 | `deepseek/deepseek-v4.1-flash` | 🟡 $0.262 | 39.5 | 150 | 1,048,576 | text+image |
-| 6 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
-| 7 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
-| 8 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
-| 9 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
+| 5 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
+| 6 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
+| 7 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
+| 8 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
+| 9 | `deepseek/deepseek-v4.1-flash` | 🟠 $0.525 | 39.5 | 75 | 1,048,576 | text+image |
 | 10 | `qwen/qwen3.8-27b` | 🟠 $0.605 | 33.7 | 56 | 1,000,000 | text+image+video |
 
 
@@ -92,8 +92,8 @@ _Code generation, debugging, review_
 | 6 | `qwen/qwen3.8-27b` | 🟠 $0.605 | 68.1 | 113 | 1,000,000 | text+image+video |
 | 7 | `minimax/minimax-m3` | 🟠 $0.525 | 58.6 | 112 | 1,048,576 | text+image+video |
 | 8 | `xiaomi/mimo-v2.5-pro` | 🟠 $0.544 | 60.2 | 111 | 1,050,000 | text |
-| 9 | `deepseek/deepseek-v4-pro-0813` | 🟠 $0.990 | 68.8 | 69 | 1,048,576 | text |
-| 10 | `z-ai/glm-5.3` | 🟠 $1.259 | 74.8 | 59 | 1,048,576 | text |
+| 9 | `z-ai/glm-5.3` | 🟠 $1.259 | 74.8 | 59 | 1,048,576 | text |
+| 10 | `google/gemini-3.8-flash` | 🔴 $1.500 | 76.3 | 51 | 1,048,576 | text+image+video+file+audio |
 
 
 ---
@@ -128,9 +128,9 @@ _Multi-step agents, function calling, computer use_
 | 4 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 42.1 | 94 | 1,050,000 | file+image+text |
 | 5 | `qwen/qwen3.8-27b` | 🟠 $0.605 | 45.8 | 76 | 1,000,000 | text+image+video |
 | 6 | `z-ai/glm-5.3` | 🟠 $1.259 | 53.1 | 42 | 1,048,576 | text |
-| 7 | `deepseek/deepseek-v4-pro-0813` | 🟠 $0.990 | 41.3 | 42 | 1,048,576 | text |
-| 8 | `meta/muse-spark-1.3` | 🔴 $2.000 | 55.5 | 28 | 1,048,576 | text+image+video+file |
-| 9 | `meta/muse-spark-1.2` | 🔴 $2.000 | 43.2 | 22 | 1,048,576 | text+image+video+file |
+| 7 | `meta/muse-spark-1.3` | 🔴 $2.000 | 55.5 | 28 | 1,048,576 | text+image+video+file |
+| 8 | `meta/muse-spark-1.2` | 🔴 $2.000 | 43.2 | 22 | 1,048,576 | text+image+video+file |
+| 9 | `deepseek/deepseek-v4-pro-0813` | 🔴 $1.980 | 41.3 | 21 | 1,048,576 | text |
 | 10 | `qwen/qwen3.8-max-0902` | 🔴 $3.000 | 56.0 | 19 | 1,000,000 | text+image+video |
 
 
@@ -144,13 +144,13 @@ _Paper analysis, long reports (context ≥ 200K)_
 | ⭐ 1 | `anthropic/claude-haiku-5.5` | 🟡 $0.200 | 43.4 | 217 | 1,000,000 | text+image+file |
 | ⭐ 2 | `xiaomi/mimo-v2.6-flash` | 🟡 $0.175 | 37.9 | 217 | 1,050,000 | text+image+video+audio |
 | ⭐ 3 | `openai/gpt-6-luna` | 🟡 $0.200 | 38.1 | 190 | 1,050,000 | file+image+text |
-| 4 | `deepseek/deepseek-v4.1-flash` | 🟡 $0.262 | 39.5 | 150 | 1,048,576 | text+image |
-| 5 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
-| 6 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
-| 7 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
-| 8 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
-| 9 | `deepseek/deepseek-v4-pro-0813` | 🟠 $0.990 | 36.0 | 36 | 1,048,576 | text |
-| 10 | `z-ai/glm-5.3` | 🟠 $1.259 | 44.8 | 36 | 1,048,576 | text |
+| 4 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
+| 5 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
+| 6 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
+| 7 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
+| 8 | `deepseek/deepseek-v4.1-flash` | 🟠 $0.525 | 39.5 | 75 | 1,048,576 | text+image |
+| 9 | `z-ai/glm-5.3` | 🟠 $1.259 | 44.8 | 36 | 1,048,576 | text |
+| 10 | `google/gemini-3.8-flash` | 🔴 $1.500 | 40.9 | 27 | 1,048,576 | text+image+video+file+audio |
 
 
 ---
@@ -163,11 +163,11 @@ _Image analysis, charts, screenshots, video_
 | ⭐ 1 | `anthropic/claude-haiku-5.5` | 🟡 $0.200 | 43.4 | 217 | 1,000,000 | text+image+file |
 | ⭐ 2 | `xiaomi/mimo-v2.6-flash` | 🟡 $0.175 | 37.9 | 217 | 1,050,000 | text+image+video+audio |
 | ⭐ 3 | `openai/gpt-6-luna` | 🟡 $0.200 | 38.1 | 190 | 1,050,000 | file+image+text |
-| 4 | `deepseek/deepseek-v4.1-flash` | 🟡 $0.262 | 39.5 | 150 | 1,048,576 | text+image |
-| 5 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
-| 6 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
-| 7 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
-| 8 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
+| 4 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
+| 5 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
+| 6 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
+| 7 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
+| 8 | `deepseek/deepseek-v4.1-flash` | 🟠 $0.525 | 39.5 | 75 | 1,048,576 | text+image |
 | 9 | `qwen/qwen3.8-27b` | 🟠 $0.605 | 33.7 | 56 | 1,000,000 | text+image+video |
 | 10 | `google/gemini-3.8-flash` | 🔴 $1.500 | 40.9 | 27 | 1,048,576 | text+image+video+file+audio |
 
