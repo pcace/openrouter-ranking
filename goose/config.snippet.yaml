@@ -1,0 +1,6 @@
+# merge under the top-level `providers:` key in ~/.config/goose/config.yaml
+providers:
+  openrouter_code:
+    enabled: true
+    model: inclusionai/ling-3.0-flash-vl
+    configured: true
