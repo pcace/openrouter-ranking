@@ -43,6 +43,30 @@ case "$(uname -s)" in
       > "$HOME/.config/environment.d/50-goose-predefined-models.conf"
     echo "✓ wrote ~/.config/environment.d/50-goose-predefined-models.conf"
     echo "  → takes effect after the next login (or launch Goose from a shell)"
+
+    # Desktop launcher override: GNOME menu launches don't inherit shell env.
+    # A wrapper keeps the JSON out of the .desktop quoting rules entirely.
+    if [ -f /usr/share/applications/goose.desktop ]; then
+      WRAPPER="$GOOSE_DIR/launch-goose-with-models.sh"
+      mkdir -p "$HOME/.local/share/applications"
+      cat > "$WRAPPER" <<WRAP
+#!/usr/bin/env bash
+export GOOSE_PREDEFINED_MODELS="\$(cat "$MIN")"
+exec /usr/lib/goose/Goose "\$@"
+WRAP
+      chmod +x "$WRAPPER"
+      cat > "$HOME/.local/share/applications/goose.desktop" <<DESK
+[Desktop Entry]
+Name=Goose
+Exec=$WRAPPER %U
+Icon=/usr/share/pixmaps/goose.png
+Terminal=false
+Type=Application
+Categories=Development;
+MimeType=x-scheme-handler/goose;
+DESK
+      echo "✓ wrote ~/.local/share/applications/goose.desktop (via $WRAPPER)"
+    fi
     ;;
   Darwin)
     launchctl setenv GOOSE_PREDEFINED_MODELS "$(cat "$MIN")" 2>/dev/null \
