@@ -344,12 +344,10 @@ catalog by coding score, price and real usage. Token figures are the last
 ./goose/install.sh            # copies provider + patches config.yaml (with backup)
 ```
 
-Then make the picker show names + prices:
+Then make the picker show names + prices. The desktop app reads
+GOOSE_PREDEFINED_MODELS from its environment, so it must be set before launch:
 
-```bash
-# add to ~/.zshrc (or ~/.bashrc), then restart your shell and Goose
-export GOOSE_PREDEFINED_MODELS="$(cat ~/git/openrouter-ranking/goose/predefined_models.json)"
-```
+  export GOOSE_PREDEFINED_MODELS="$(cat ~/git/openrouter-ranking/goose/predefined_models.min.json)"
 
 The API key is read from the `{API_KEY_ENV}` secret in Goose's keyring
 (`goose configure` → your provider), same as any other OpenRouter setup.
@@ -386,6 +384,11 @@ def main():
     with open(os.path.join(args.out, "predefined_models.json"), "w") as f:
         json.dump(pre, f, indent=2)
         f.write("\n")
+
+    # Single-line copy: GOOSE_PREDEFINED_MODELS is an env var, so it must not
+    # contain newlines.
+    with open(os.path.join(args.out, "predefined_models.min.json"), "w") as f:
+        f.write(json.dumps(pre, separators=(",", ":")))
 
     first = selected[0]["id"]
     snippet = (

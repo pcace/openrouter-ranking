@@ -1,6 +1,6 @@
 # Goose config — OpenRouter coding models
 
-Generated **2026-10-12 11:19 UTC**. 10 models, selected from the live OpenRouter
+Generated **2026-10-12 11:24 UTC**. 10 models, selected from the live OpenRouter
 catalog by coding score, price and real usage. Token figures are the last
 7 days (share of all OpenRouter traffic in the window).
 
@@ -23,12 +23,10 @@ catalog by coding score, price and real usage. Token figures are the last
 ./goose/install.sh            # copies provider + patches config.yaml (with backup)
 ```
 
-Then make the picker show names + prices:
+Then make the picker show names + prices. The desktop app reads
+GOOSE_PREDEFINED_MODELS from its environment, so it must be set before launch:
 
-```bash
-# add to ~/.zshrc (or ~/.bashrc), then restart your shell and Goose
-export GOOSE_PREDEFINED_MODELS="$(cat ~/git/openrouter-ranking/goose/predefined_models.json)"
-```
+  export GOOSE_PREDEFINED_MODELS="$(cat ~/git/openrouter-ranking/goose/predefined_models.min.json)"
 
 The API key is read from the `OPENROUTER_API_KEY` secret in Goose's keyring
 (`goose configure` → your provider), same as any other OpenRouter setup.

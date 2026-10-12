@@ -30,13 +30,34 @@ with open(cfg_path, "w") as f:
     yaml.safe_dump(cfg, f, sort_keys=False, allow_unicode=True)
 PY
 
+# --- Make the picker show names + prices -------------------------------------
+# The app reads GOOSE_PREDEFINED_MODELS from its own environment at launch, and
+# the value must be a single line.
+MIN="$SRC/predefined_models.min.json"
+EXPORT_LINE="export GOOSE_PREDEFINED_MODELS=\"\$(cat $MIN)\""
+
+case "$(uname -s)" in
+  Linux)
+    mkdir -p "$HOME/.config/environment.d"
+    printf 'GOOSE_PREDEFINED_MODELS=%s\n' "$(cat "$MIN")" \
+      > "$HOME/.config/environment.d/50-goose-predefined-models.conf"
+    echo "✓ wrote ~/.config/environment.d/50-goose-predefined-models.conf"
+    echo "  → takes effect after the next login (or launch Goose from a shell)"
+    ;;
+  Darwin)
+    launchctl setenv GOOSE_PREDEFINED_MODELS "$(cat "$MIN")" 2>/dev/null \
+      && echo "✓ launchctl setenv GOOSE_PREDEFINED_MODELS (until reboot)"
+    ;;
+esac
+
 cat <<EOF
 
-Almost done. Make the picker show names + prices by adding this once to
-~/.zshrc (or ~/.bashrc) and restarting Goose:
+Model names + prices are enabled via GOOSE_PREDEFINED_MODELS. For terminals,
+add this to ~/.bashrc (or ~/.zshrc):
 
-  export GOOSE_PREDEFINED_MODELS="\$(cat $SRC/predefined_models.json)"
+  $EXPORT_LINE
 
-The API key is read from Goose's keyring under OPENROUTER_API_KEY
-(same secret the wigolo extension already uses).
+Then fully quit and restart Goose. The API key is read from Goose's keyring
+under OPENROUTER_API_KEY (the same secret the wigolo extension already uses).
 EOF
+
