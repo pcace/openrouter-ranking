@@ -19,7 +19,7 @@ DEST="${GOOSE_CONFIG_HOME:-$HOME/.local/share/goose-ranking}"
 
 echo "🔄 Goose-Config von $REPO_RAW laden → $DEST"
 mkdir -p "$DEST/goose"
-for f in install.sh openrouter_code.json predefined_models.min.json; do
+for f in install.sh openrouter_code.json config.snippet.yaml predefined_models.min.json; do
   curl -fsSL --max-time 60 "$REPO_RAW/$f" -o "$DEST/goose/$f"
   echo "  ✓ $f"
 done
