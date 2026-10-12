@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: update-ranking
+  cancel-in-progress: false
+
 jobs:
   update-ranking:
     runs-on: ubuntu-latest
@@ -20,7 +24,19 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Check API key
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -n "$OPENROUTER_API_KEY" ]; then
+            echo "OPENROUTER_API_KEY is set — usage section enabled"
+          else
+            echo "::warning::OPENROUTER_API_KEY secret is missing; generating without the usage section"
+          fi
+
       - name: Generate ranking
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: python generate_ranking.py
 
       - name: Commit and push if changed

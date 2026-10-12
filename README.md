@@ -1,167 +1,216 @@
 # 🏆 OpenRouter LLM Cost-Effectiveness Ranking
 
-[![Update Ranking](https://github.com/Draxo-io/openrouter-ranking/actions/workflows/update-ranking.yml/badge.svg)](https://github.com/Draxo-io/openrouter-ranking/actions/workflows/update-ranking.yml)
-[![Last Updated](https://img.shields.io/badge/updated-2026-09-28%2019:03%20UTC-blue)](https://github.com/Draxo-io/openrouter-ranking)
-
-> **Updated:** 2026-09-28 19:03 UTC  
-> **Total models on OpenRouter:** 460  
-> **Paid models analyzed:** 434  
-> **Methodology:** Price per 1M tokens (750K prompt + 250K completion). Data via [OpenRouter API](https://openrouter.ai/api/v1/models).
+> **Updated:** 2026-10-12 10:07 UTC
+> **Models on OpenRouter:** 458 · **Families priced:** 338 · **With benchmark scores:** 211
+> **Methodology:** value = benchmark index ÷ blended price per 1M tokens (750K prompt + 250K completion). Data via [OpenRouter API](https://openrouter.ai/api/v1/models).
 
 ---
 
-## 📖 About
+## 📖 How this works
 
-This ranking is generated **automatically every week** and orders models available on [OpenRouter](https://openrouter.ai) by **cost-effectiveness**, organized by real-world use cases:
+Every category below is defined by a **rule** (a benchmark metric plus a filter),
+not by a hand-picked list. Any model that OpenRouter ships is scored automatically:
 
-- 💬 Daily chat and general assistant
-- 💻 Programming and code
-- 🧠 Complex reasoning (math, logic)
-- 🔍 Research and long document analysis
-- 🌐 Multimodal (image, video, audio)
-- ⚡ Simple tasks and high volume
+- **Effectiveness** ← Artificial Analysis indices (`intelligence`, `coding`, `agentic`)
+  and Design Arena ELO, embedded in each model object from the API.
+- **Cost** ← live pricing from the same response.
+- Categories filter on capabilities from the API: `supported_parameters` (tools,
+  reasoning), `context_length`, and `architecture.input_modalities`.
 
-**Prices in USD.** Symbols: 🟢 cheap (<$0.15/M) 🟡 medium ($0.15-$0.50/M) 🟠 premium ($0.50-$1.50/M) 🔴 elite (>$1.50/M).
+Add a model to OpenRouter → it shows up here on the next run. No code change.
 
-⭐ = Top 3 recommendations per category.
+**Prices in USD per 1M tokens (blended).** 🟢 <$0.15 · 🟡 <$0.50 · 🟠 <$1.50 · 🔴 ≥$1.50.
+`In` = accepted input modalities.
 
 ---
 
-## 🏆 Top 3 Overall
+## 🏆 Top Picks (computed, not curated)
 
-| Position | Model | Why |
-|----------|------|-----|
-| 🥇 Best Overall | `deepseek/deepseek-v4-pro` ($0.98/1M) | Best quality/price ratio across all categories. |
-| 🥈 Best Bargain | `qwen/qwen3-235b-a22b-2507` ($0.15/1M) | 235B parameters (MoE) for only $0.09/1M tokens. |
-| 🥉 Best All-Rounder | `qwen/qwen3.7-plus` ($0.56/1M) | 1M context, multimodal, versatile at $0.70/1M. |
+| | Model | Why |
+|---|-------|-----|
+| 🥇 Best value | `anthropic/claude-haiku-5.5` | 43 intelligence for 0.200/1M |
+| 🥈 Highest score | `anthropic/claude-opus-5.5` | 58 intelligence (absolute top) |
+| 🥉 Cheapest usable | `inclusionai/ling-3.0-flash-vl` | $0.031/1M at 25 intelligence |
 
 
 ---
 
-## 💡 Quick Recommendations
+## 📈 Most Used (last 7 days, by tokens)
 
-| Scenario | Best Pick |
-|----------|-----------|
-| 💸 Cheapest possible? | `qwen/qwen3-235b-a22b-2507` ($0.09/M) and `qwen/qwen3-235b-a22b-thinking-2507` ($0.10/M) |
-| ⭐ Best all-rounder? | `deepseek/deepseek-v4-pro` ($0.54/M) — does everything well |
-| 📚 Need 1M context? | `qwen/qwen3.7-plus` ($0.70/M) |
-| 💻 Code? | `qwen/qwen3-coder-flash` ($0.39/M) or `qwen/qwen3-coder` ($0.62/M) |
-| 👁️ Multimodal / Vision? | `qwen/qwen3-vl-235b-a22b-instruct` ($0.37/M) |
-| 🏔️ No budget limit? | `anthropic/claude-sonnet-4.5` ($6/M) or `openai/gpt-5` ($3.44/M) |
+_Real OpenRouter traffic — what is actually being run, not what is best value._
+
+| # | Model | Share | $/1M | Intelligence |
+|---|-------|-------|------|--------------|
+| 1 | `deepseek/deepseek-v4.1-flash-20260910` | 25.5% | $0.525 | 39.5 |
+| 2 | `z-ai/glm-5.3-flash-20260826` | 7.6% | $0.317 | 41.8 |
+| 3 | `xiaomi/mimo-v2.6-flash-20260921` | 7.1% | $0.175 | 37.9 |
+| 4 | `stepfun/step-5-preview-20261008` | 5.5% | $1.425 | — |
+| 5 | `tencent/hy4-preview-20260827` | 5.2% | $1.251 | — |
+| 6 | `openai/gpt-6-luna-20260922` | 4.4% | $0.200 | 38.1 |
+| 7 | `nvidia/nemotron-3-ultra-550b-a55b-20260604:free` | 4.3% | $1.050 | 22.9 |
+| 8 | `anthropic/claude-opus-5.5-20260921` | 3.1% | $8.000 | 57.6 |
+| 9 | `deepseek/deepseek-v4-flash-20260731` | 3.1% | $0.343 | 24.4 |
+| 10 | `stealth/space-bunny-alpha` | 2.6% | — | — |
+| 11 | `z-ai/glm-5.3-20260816` | 2.4% | $1.259 | 44.8 |
+| 12 | `typesafe/jev-1.13-20260917` | 2.1% | — | — |
+| 13 | `deepseek/deepseek-v4-flash-20260423` | 1.9% | $0.343 | 24.4 |
+| 14 | `tencent/hy3-20260706` | 1.6% | $0.231 | — |
+| 15 | `anthropic/claude-sonnet-5.5-20260928` | 1.5% | $4.000 | 56.0 |
 
 
 ---
 
-## 💬 Daily Chat / General Assistant
-_Conversations, Q&A, summaries, translation, creative writing_
+## 💬 General Assistant
+_Everyday chat, Q&A, summaries, translation_
 
-| # | Model | $/1M Tokens | Prompt (¢/1M) | Compl (¢/1M) | P/C | Context | Notes |
-|---|--------|------------|--------------|--------------|-----|----------|------|
-| ⭐ 1 | `deepseek/deepseek-v4-pro` | 🟠 $0.9787 | $0.78 | $1.57 | 2.0x | 1,048,576 | 🔥 Best overall value. GPT-4o-class quality at flash prices. |
-| ⭐ 2 | `deepseek/deepseek-v3.2-exp` | 🟡 $0.1512 | $0.13 | $0.20 | 1.5x | 163,840 | DeepSeek experimental. Strong reasoning, cheap. |
-| ⭐ 3 | `qwen/qwen3.7-plus` | 🟠 $0.5600 | $0.32 | $1.28 | 4.0x | 1,000,000 | Qwen's mid-tier workhorse. 1M context, great value. |
-|  4 | `openai/gpt-5-mini` | 🟠 $0.6875 | $0.25 | $2.00 | 8.0x | 400,000 | GPT-5 Mini. 400K context, affordable OpenAI quality. |
-|  5 | `x-ai/grok-4.3` | 🔴 $1.5625 | $1.25 | $2.50 | 2.0x | 1,000,000 | Grok 4.3. 1M context, built-in web search. |
-|  6 | `openai/gpt-5` | 🔴 $3.4375 | $1.25 | $10.00 | 8.0x | 400,000 | GPT-5. The gold standard for complex tasks. |
-|  7 | `anthropic/claude-sonnet-4.5` | 🔴 $6.0000 | $3.00 | $15.00 | 5.0x | 1,000,000 | Claude Sonnet 4.5. 1M context, deep analysis. |
-|  8 | `google/gemini-3.5-flash` | 🔴 $3.3750 | $1.50 | $9.00 | 6.0x | 1,048,576 | Gemini Flash. Native multimodal, 1M context. |
+| # | Model | $/1M | Intelligence idx | Value | Context | In |
+|---|-------|------|-----------|-------|---------|----|
+| ⭐ 1 | `anthropic/claude-haiku-5.5` | 🟡 $0.200 | 43.4 | 217 | 1,000,000 | text+image+file |
+| ⭐ 2 | `xiaomi/mimo-v2.6-flash` | 🟡 $0.175 | 37.9 | 217 | 1,050,000 | text+image+video+audio |
+| ⭐ 3 | `deepseek/deepseek-v4-flash-0731` | 🟡 $0.172 | 34.3 | 199 | 1,048,576 | text |
+| 4 | `openai/gpt-6-luna` | 🟡 $0.200 | 38.1 | 190 | 1,050,000 | file+image+text |
+| 5 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
+| 6 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
+| 7 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
+| 8 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
+| 9 | `deepseek/deepseek-v4.1-flash` | 🟠 $0.525 | 39.5 | 75 | 1,048,576 | text+image |
+| 10 | `qwen/qwen3.8-27b` | 🟠 $0.605 | 33.7 | 56 | 1,000,000 | text+image+video |
 
 
 ---
 
 ## 💻 Programming / Code
-_Code generation, debugging, code review, software architecture_
+_Code generation, debugging, review_
 
-| # | Model | $/1M Tokens | Prompt (¢/1M) | Compl (¢/1M) | P/C | Context | Notes |
-|---|--------|------------|--------------|--------------|-----|----------|------|
-| ⭐ 1 | `deepseek/deepseek-v4-pro` | 🟠 $0.9787 | $0.78 | $1.57 | 2.0x | 1,048,576 | 🔥 Unbeatable: production-quality code at flash prices. |
-| ⭐ 2 | `qwen/qwen3-coder` | 🟡 $0.4750 | $0.30 | $1.00 | 3.3x | 262,144 | Dedicated 480B coder. 1M context. |
-| ⭐ 3 | `qwen/qwen3-coder-flash` | 🟡 $0.3900 | $0.20 | $0.97 | 5.0x | 1,000,000 | Coder Flash. Fast and efficient for code tasks. |
-|  4 | `qwen/qwen3-coder-30b-a3b-instruct` | 🟢 $0.1225 | $0.07 | $0.28 | 4.0x | 262,144 | Ultra-cheap for simple code. $0.12/1M! |
-|  5 | `mistralai/codestral-2508` | 🟡 $0.4500 | $0.30 | $0.90 | 3.0x | 256,000 | Mistral's Codestral. Code-focused, solid performance. |
-|  6 | `x-ai/grok-build-0.1` | 🟠 $1.2500 | $1.00 | $2.00 | 2.0x | 256,000 | Grok Build. Optimized for software engineering. |
-|  8 | `anthropic/claude-sonnet-4.5` | 🔴 $6.0000 | $3.00 | $15.00 | 5.0x | 1,000,000 | Claude Sonnet. Excellent for refactoring and PR reviews. |
+| # | Model | $/1M | Coding idx | Value | Context | In |
+|---|-------|------|-----------|-------|---------|----|
+| ⭐ 1 | `deepseek/deepseek-v4-flash-0731` | 🟡 $0.172 | 69.1 | 402 | 1,048,576 | text |
+| ⭐ 2 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 71.5 | 225 | 1,048,576 | text+image+video |
+| ⭐ 3 | `tencent/hy3-preview` | 🟡 $0.285 | 58.8 | 206 | 262,144 | text |
+| 4 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 65.0 | 201 | 1,048,576 | text+image |
+| 5 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 71.4 | 159 | 1,050,000 | file+image+text |
+| 6 | `qwen/qwen3.8-27b` | 🟠 $0.605 | 68.1 | 113 | 1,000,000 | text+image+video |
+| 7 | `minimax/minimax-m3` | 🟠 $0.525 | 58.6 | 112 | 1,048,576 | text+image+video |
+| 8 | `xiaomi/mimo-v2.5-pro` | 🟠 $0.544 | 60.2 | 111 | 1,050,000 | text |
+| 9 | `z-ai/glm-5.3` | 🟠 $1.259 | 74.8 | 59 | 1,048,576 | text |
+| 10 | `google/gemini-3.8-flash` | 🔴 $1.500 | 76.3 | 51 | 1,048,576 | text+image+video+file+audio |
 
 
 ---
 
 ## 🧠 Complex Reasoning
-_Math, logic, science, step-by-step problem solving_
+_Math, logic, step-by-step problem solving_
 
-| # | Model | $/1M Tokens | Prompt (¢/1M) | Compl (¢/1M) | P/C | Context | Notes |
-|---|--------|------------|--------------|--------------|-----|----------|------|
-| ⭐ 1 | `deepseek/deepseek-v4-pro` | 🟠 $0.9787 | $0.78 | $1.57 | 2.0x | 1,048,576 | 🔥 Strong reasoning at lightweight model prices. |
-| ⭐ 2 | `qwen/qwen3-235b-a22b-thinking-2507` | 🟠 $0.7475 | $0.23 | $2.30 | 10.0x | 131,072 | 235B MoE Thinking for $0.10/1M! The ultimate bargain. |
-| ⭐ 3 | `deepseek/deepseek-v3.2-exp` | 🟡 $0.1512 | $0.13 | $0.20 | 1.5x | 163,840 | Excellent on reasoning benchmarks. |
-|  4 | `qwen/qwen3-next-80b-a3b-thinking` | 🟡 $0.4125 | $0.15 | $1.20 | 8.0x | 262,144 | 80B MoE thinking, affordable. |
-|  5 | `qwen/qwen3.7-max` | 🔴 $2.2125 | $1.48 | $4.42 | 3.0x | 1,000,000 | Qwen's top reasoning tier. 1M context. |
-|  6 | `openai/o4-mini` | 🔴 $1.9250 | $1.10 | $4.40 | 4.0x | 200,000 | Accessible OpenAI reasoning. |
-|  7 | `anthropic/claude-opus-4.8` | 🔴 $10.0000 | $5.00 | $25.00 | 5.0x | 1,000,000 | Anthropic's best. Pricey but unmatched depth. |
-|  8 | `openai/o3-pro` | 🔴 $35.0000 | $20.00 | $80.00 | 4.0x | 200,000 | OpenAI's most powerful reasoning model. |
+| # | Model | $/1M | Intelligence idx | Value | Context | In |
+|---|-------|------|-----------|-------|---------|----|
+| ⭐ 1 | `anthropic/claude-haiku-5.5` | 🟡 $0.200 | 43.4 | 217 | 1,000,000 | text+image+file |
+| ⭐ 2 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
+| ⭐ 3 | `z-ai/glm-5.3` | 🟠 $1.259 | 44.8 | 36 | 1,048,576 | text |
+| 4 | `meta/muse-spark-1.3` | 🔴 $2.000 | 48.1 | 24 | 1,048,576 | text+image+video+file |
+| 5 | `x-ai/grok-4.7` | 🔴 $3.000 | 46.4 | 15 | 500,000 | text+image+file |
+| 6 | `qwen/qwen3.8-max-0902` | 🔴 $3.000 | 45.4 | 15 | 1,000,000 | text+image+video |
+| 7 | `x-ai/grok-4.6` | 🔴 $3.000 | 44.3 | 15 | 500,000 | text+image+file |
+| 8 | `moonshotai/kimi-k3` | 🔴 $3.047 | 43.6 | 14 | 1,048,576 | text+image+video |
+| 9 | `anthropic/claude-sonnet-5.5` | 🔴 $4.000 | 56.0 | 14 | 1,000,000 | text+image+file |
+| 10 | `openai/gpt-6.1-sol` | 🔴 $4.000 | 51.8 | 13 | 1,050,000 | file+image+text |
+
+
+---
+
+## 🤖 Agentic / Tool Use
+_Multi-step agents, function calling, computer use_
+
+| # | Model | $/1M | Agentic idx | Value | Context | In |
+|---|-------|------|-----------|-------|---------|----|
+| ⭐ 1 | `deepseek/deepseek-v4-flash-0731` | 🟡 $0.172 | 41.0 | 238 | 1,048,576 | text |
+| ⭐ 2 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 50.9 | 160 | 1,048,576 | text+image+video |
+| ⭐ 3 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 47.5 | 147 | 1,048,576 | text+image |
+| 4 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 42.1 | 94 | 1,050,000 | file+image+text |
+| 5 | `qwen/qwen3.8-27b` | 🟠 $0.605 | 45.8 | 76 | 1,000,000 | text+image+video |
+| 6 | `z-ai/glm-5.3` | 🟠 $1.259 | 53.1 | 42 | 1,048,576 | text |
+| 7 | `meta/muse-spark-1.3` | 🔴 $2.000 | 55.5 | 28 | 1,048,576 | text+image+video+file |
+| 8 | `meta/muse-spark-1.2` | 🔴 $2.000 | 43.2 | 22 | 1,048,576 | text+image+video+file |
+| 9 | `deepseek/deepseek-v4-pro-0813` | 🔴 $1.980 | 41.3 | 21 | 1,048,576 | text |
+| 10 | `qwen/qwen3.8-max-0902` | 🔴 $3.000 | 56.0 | 19 | 1,000,000 | text+image+video |
 
 
 ---
 
 ## 🔍 Research / Long Documents
-_Paper analysis, legal docs, long reports (requires >100K context)_
+_Paper analysis, long reports (context ≥ 200K)_
 
-| # | Model | $/1M Tokens | Prompt (¢/1M) | Compl (¢/1M) | P/C | Context | Notes |
-|---|--------|------------|--------------|--------------|-----|----------|------|
-| ⭐ 1 | `qwen/qwen3.7-plus` | 🟠 $0.5600 | $0.32 | $1.28 | 4.0x | 1,000,000 | 🔥 1M context for $0.70. Best value for long docs. |
-| ⭐ 2 | `google/gemini-3.5-flash` | 🔴 $3.3750 | $1.50 | $9.00 | 6.0x | 1,048,576 | Native multimodal, handles any format. |
-| ⭐ 3 | `anthropic/claude-sonnet-4.5` | 🔴 $6.0000 | $3.00 | $15.00 | 5.0x | 1,000,000 | Most precise and thorough document analysis. |
-|  4 | `deepseek/deepseek-v4-pro` | 🟠 $0.9787 | $0.78 | $1.57 | 2.0x | 1,048,576 | Solid for medium docs (164K ctx). |
-|  5 | `openai/gpt-5` | 🔴 $3.4375 | $1.25 | $10.00 | 8.0x | 400,000 | OpenAI quality, 400K context. |
+| # | Model | $/1M | Intelligence idx | Value | Context | In |
+|---|-------|------|-----------|-------|---------|----|
+| ⭐ 1 | `anthropic/claude-haiku-5.5` | 🟡 $0.200 | 43.4 | 217 | 1,000,000 | text+image+file |
+| ⭐ 2 | `xiaomi/mimo-v2.6-flash` | 🟡 $0.175 | 37.9 | 217 | 1,050,000 | text+image+video+audio |
+| ⭐ 3 | `openai/gpt-6-luna` | 🟡 $0.200 | 38.1 | 190 | 1,050,000 | file+image+text |
+| 4 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
+| 5 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
+| 6 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
+| 7 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
+| 8 | `deepseek/deepseek-v4.1-flash` | 🟠 $0.525 | 39.5 | 75 | 1,048,576 | text+image |
+| 9 | `z-ai/glm-5.3` | 🟠 $1.259 | 44.8 | 36 | 1,048,576 | text |
+| 10 | `google/gemini-3.8-flash` | 🔴 $1.500 | 40.9 | 27 | 1,048,576 | text+image+video+file+audio |
 
 
 ---
 
-## 🌐 Multimodal (Image/Video/Audio)
-_Image analysis, charts, screenshots, video understanding_
+## 🌐 Multimodal (Image/Video/Audio input)
+_Image analysis, charts, screenshots, video_
 
-| # | Model | $/1M Tokens | Prompt (¢/1M) | Compl (¢/1M) | P/C | Context | Notes |
-|---|--------|------------|--------------|--------------|-----|----------|------|
-| ⭐ 1 | `qwen/qwen3-vl-235b-a22b-instruct` | 🟠 $0.6325 | $0.21 | $1.90 | 9.0x | 262,144 | 🔥 235B MoE vision. Unbeatable price. |
-| ⭐ 2 | `google/gemini-3.5-flash` | 🔴 $3.3750 | $1.50 | $9.00 | 6.0x | 1,048,576 | Best multimodal: text+image+audio+video natively. |
-| ⭐ 3 | `qwen/qwen3-vl-30b-a3b-instruct` | 🟡 $0.2625 | $0.15 | $0.60 | 4.0x | 262,144 | Compact VL model, very cheap ($0.23/1M). |
-|  4 | `openai/gpt-5` | 🔴 $3.4375 | $1.25 | $10.00 | 8.0x | 400,000 | Image+file support, OpenAI quality. |
-|  5 | `anthropic/claude-sonnet-4.5` | 🔴 $6.0000 | $3.00 | $15.00 | 5.0x | 1,000,000 | Image+file support, precise analysis. |
+| # | Model | $/1M | Intelligence idx | Value | Context | In |
+|---|-------|------|-----------|-------|---------|----|
+| ⭐ 1 | `anthropic/claude-haiku-5.5` | 🟡 $0.200 | 43.4 | 217 | 1,000,000 | text+image+file |
+| ⭐ 2 | `xiaomi/mimo-v2.6-flash` | 🟡 $0.175 | 37.9 | 217 | 1,050,000 | text+image+video+audio |
+| ⭐ 3 | `openai/gpt-6-luna` | 🟡 $0.200 | 38.1 | 190 | 1,050,000 | file+image+text |
+| 4 | `z-ai/glm-5.3-flash` | 🟡 $0.317 | 41.8 | 132 | 1,048,576 | text+image+video |
+| 5 | `deepseek/deepseek-v4-flash-vision-exp` | 🟡 $0.323 | 34.8 | 108 | 1,048,576 | text+image |
+| 6 | `xiaomi/mimo-v2.6-pro` | 🟠 $0.544 | 46.3 | 85 | 1,050,000 | text+image+video+audio |
+| 7 | `openai/gpt-5.6-luna` | 🟡 $0.450 | 37.3 | 83 | 1,050,000 | file+image+text |
+| 8 | `deepseek/deepseek-v4.1-flash` | 🟠 $0.525 | 39.5 | 75 | 1,048,576 | text+image |
+| 9 | `qwen/qwen3.8-27b` | 🟠 $0.605 | 33.7 | 56 | 1,000,000 | text+image+video |
+| 10 | `google/gemini-3.8-flash` | 🔴 $1.500 | 40.9 | 27 | 1,048,576 | text+image+video+file+audio |
 
 
 ---
 
 ## ⚡ Simple Tasks / High Volume
-_Classification, extraction, batch processing, repetitive tasks_
+_Cheapest models that still score ≥ 20 on intelligence_
 
-| # | Model | $/1M Tokens | Prompt (¢/1M) | Compl (¢/1M) | P/C | Context | Notes |
-|---|--------|------------|--------------|--------------|-----|----------|------|
-| ⭐ 1 | `qwen/qwen3-235b-a22b-2507` | 🟡 $0.1531 | $0.09 | $0.35 | 4.0x | 262,144 | 🔥 Cheapest on the list! 235B for $0.09/1M. |
-| ⭐ 2 | `openai/gpt-5-nano` | 🟢 $0.1375 | $0.05 | $0.40 | 8.0x | 400,000 | OpenAI quality, cheap ($0.14/1M). |
-| ⭐ 3 | `google/gemini-2.5-flash-lite` | 🟡 $0.1750 | $0.10 | $0.40 | 4.0x | 1,048,576 | Google's budget option + 1M context. |
-|  5 | `mistralai/mistral-small-3.2-24b-instruct` | 🟢 $0.1328 | $0.09 | $0.25 | 2.7x | 256,000 | 24B multimodal, affordable. |
-|  6 | `meta-llama/llama-4-scout` | 🟡 $0.1500 | $0.10 | $0.30 | 3.0x | 1,310,720 | 10M context! Largest on the market. |
+| # | Model | $/1M | Intelligence idx | idx/$ | Context | In |
+|---|-------|------|-----------|-------|---------|----|
+| ⭐ 1 | `inclusionai/ling-3.0-flash-vl` | 🟢 $0.031 | 24.6 | 790 | 262,144 | text+image+video |
+| ⭐ 2 | `inclusionai/ling-3.0-flash` | 🟢 $0.032 | 20.1 | 638 | 262,144 | text |
+| ⭐ 3 | `inclusionai/ling-3.0-flash-fin` | 🟢 $0.062 | 22.6 | 363 | 262,144 | text |
+| 4 | `upstage/solar-mini4` | 🟢 $0.087 | 24.1 | 275 | 524,288 | text |
+| 5 | `upstage/solar-pro4` | 🟡 $0.158 | 28.2 | 179 | 524,288 | text |
+| 6 | `deepseek/deepseek-v4-flash-0731` | 🟡 $0.172 | 34.3 | 199 | 1,048,576 | text |
+| 7 | `xiaomi/mimo-v2.6-flash` | 🟡 $0.175 | 37.9 | 217 | 1,050,000 | text+image+video+audio |
+| 8 | `xiaomi/mimo-v2.5` | 🟡 $0.175 | 25.2 | 144 | 1,050,000 | text+audio+image+video |
+| 9 | `anthropic/claude-haiku-5.5` | 🟡 $0.200 | 43.4 | 217 | 1,000,000 | text+image+file |
+| 10 | `openai/gpt-6-luna` | 🟡 $0.200 | 38.1 | 190 | 1,050,000 | file+image+text |
 
 
 ---
 
 ## 🔧 Methodology
 
-- **Source:** [OpenRouter API](https://openrouter.ai/api/v1/models) (real-time data)
-- **Cost formula:** `(prompt_price × 750,000) + (completion_price × 250,000)` = cost per 1M tokens
-- **Ratio:** Assumes 75% prompt / 25% completion (typical chat usage)
-- **Ranking:** Ordered by cost-effectiveness within each category, not just price
-- **Updates:** Weekly (via GitHub Actions)
+- **Source:** [OpenRouter API](https://openrouter.ai/api/v1/models) — live catalog incl. benchmark scores
+- **Cost formula:** `prompt_price × 750,000 + completion_price × 250,000`
+- **Value:** `benchmark_index / cost_per_1M` (higher is better); ranked descending
+- **Family collapse:** routing/alias variants (`:free`, `:nitro`, `~alias`) are merged
+  into their base model family, keeping the cheapest representative
+- **Coverage:** models without a benchmark score are skipped in metric-based
+  categories rather than guessed at
+- **Updates:** weekly via GitHub Actions
+
+---
+
+*Data source: OpenRouter (openrouter.ai). Usage figures from openrouter.ai/rankings (CC BY 4.0, as of 2026-10-12 10:07 UTC). Fork of Draxo-io/openrouter-ranking.*
 
 ---
 
 ## 🤖 Automation
 
-This repository is updated automatically via:
-- **GitHub Actions:** Every Monday at 12:00 UTC
-- **Hermes Agent:** Weekly cron job that generates and publishes the ranking
-
-To run manually: `python generate_ranking.py`
-
----
-
-*Created by [@Draxo-io](https://github.com/Draxo-io) · [draxo.io](https://draxo.io)*
+Generated weekly by GitHub Actions (`.github/workflows/update-ranking.yml`).
+Run manually: `python generate_ranking.py` (set `OPENROUTER_API_KEY` for the usage section).

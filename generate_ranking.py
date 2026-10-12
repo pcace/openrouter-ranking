@@ -1,365 +1,396 @@
 #!/usr/bin/env python3
 """
-OpenRouter LLM Cost-Effectiveness Ranking Generator
-Fetches live pricing from OpenRouter API and generates a ranked README.md
-organized by use case with cost-benefit analysis.
+OpenRouter LLM Ranking Generator (dynamic)
 
-Usage: python generate_ranking.py [--output README.md]
+Fetches the live model catalog from OpenRouter and ranks models per use case by
+cost-effectiveness, where effectiveness comes from real benchmark scores that the
+OpenRouter API embeds in every model object (Artificial Analysis indices and
+Design Arena ELO). No model lists are hardcoded; categories are defined by a
+metric + filter, so new/removed models appear automatically.
+
+Usage: python generate_ranking_dynamic.py [--output README.md] [--api-key KEY]
 """
 
-import json, urllib.request, sys, os
-from datetime import datetime, timezone
-from collections import defaultdict
+import argparse
+import json
+import os
+import sys
+import urllib.request
+from datetime import datetime, timedelta, timezone
 
-OPENROUTER_API = "https://openrouter.ai/api/v1/models"
-OUTPUT_FILE = "README.md"
+MODELS_API = "https://openrouter.ai/api/v1/models"
+RANKINGS_API = "https://openrouter.ai/api/v1/datasets/rankings-daily"
+PROMPT_TOKENS = 750_000
+COMPLETION_TOKENS = 250_000
+USAGE_WINDOW_DAYS = 7
 
-# ── Task definitions ──────────────────────────────────────────────
-
-TASKS = {
-    "💬 Daily Chat / General Assistant": {
-        "desc": "Conversations, Q&A, summaries, translation, creative writing",
-        "models": [
-            "deepseek/deepseek-v4-pro",
-            "deepseek/deepseek-v3.2-exp",
-            "qwen/qwen3.7-plus",
-            "openai/gpt-5-mini",
-            "x-ai/grok-4.3",
-            "openai/gpt-5",
-            "anthropic/claude-sonnet-4.5",
-            "google/gemini-3.5-flash",
-        ],
-        "notes": {
-            "deepseek/deepseek-v4-pro": "🔥 Best overall value. GPT-4o-class quality at flash prices.",
-            "deepseek/deepseek-v3.2-exp": "DeepSeek experimental. Strong reasoning, cheap.",
-            "qwen/qwen3.7-plus": "Qwen's mid-tier workhorse. 1M context, great value.",
-            "openai/gpt-5-mini": "GPT-5 Mini. 400K context, affordable OpenAI quality.",
-            "x-ai/grok-4.3": "Grok 4.3. 1M context, built-in web search.",
-            "openai/gpt-5": "GPT-5. The gold standard for complex tasks.",
-            "anthropic/claude-sonnet-4.5": "Claude Sonnet 4.5. 1M context, deep analysis.",
-            "google/gemini-3.5-flash": "Gemini Flash. Native multimodal, 1M context.",
-        }
+# Category definitions are pure predicates over model metadata + a metric to rank by.
+# "value" = metric_per_dollar = benchmark_index / blended_price_1M (higher is better).
+CATEGORIES = [
+    {
+        "name": "💬 General Assistant",
+        "desc": "Everyday chat, Q&A, summaries, translation",
+        "metric": "intelligence",
+        "filter": lambda m: True,
+        "sort": "value",
+        "floor": 0.55,
     },
-    "💻 Programming / Code": {
-        "desc": "Code generation, debugging, code review, software architecture",
-        "models": [
-            "deepseek/deepseek-v4-pro",
-            "qwen/qwen3-coder",
-            "qwen/qwen3-coder-flash",
-            "qwen/qwen3-coder-30b-a3b-instruct",
-            "mistralai/codestral-2508",
-            "x-ai/grok-build-0.1",
-            "openai/gpt-5-codex",
-            "anthropic/claude-sonnet-4.5",
-        ],
-        "notes": {
-            "deepseek/deepseek-v4-pro": "🔥 Unbeatable: production-quality code at flash prices.",
-            "qwen/qwen3-coder": "Dedicated 480B coder. 1M context.",
-            "qwen/qwen3-coder-flash": "Coder Flash. Fast and efficient for code tasks.",
-            "qwen/qwen3-coder-30b-a3b-instruct": "Ultra-cheap for simple code. $0.12/1M!",
-            "mistralai/codestral-2508": "Mistral's Codestral. Code-focused, solid performance.",
-            "x-ai/grok-build-0.1": "Grok Build. Optimized for software engineering.",
-            "openai/gpt-5-codex": "GPT-5 Codex. OpenAI's top-tier coding model.",
-            "anthropic/claude-sonnet-4.5": "Claude Sonnet. Excellent for refactoring and PR reviews.",
-        }
+    {
+        "name": "💻 Programming / Code",
+        "desc": "Code generation, debugging, review",
+        "metric": "coding",
+        "filter": lambda m: True,
+        "sort": "value",
+        "floor": 0.70,
     },
-    "🧠 Complex Reasoning": {
-        "desc": "Math, logic, science, step-by-step problem solving",
-        "models": [
-            "deepseek/deepseek-v4-pro",
-            "qwen/qwen3-235b-a22b-thinking-2507",
-            "deepseek/deepseek-v3.2-exp",
-            "qwen/qwen3-next-80b-a3b-thinking",
-            "qwen/qwen3.7-max",
-            "openai/o4-mini",
-            "anthropic/claude-opus-4.8",
-            "openai/o3-pro",
-        ],
-        "notes": {
-            "deepseek/deepseek-v4-pro": "🔥 Strong reasoning at lightweight model prices.",
-            "qwen/qwen3-235b-a22b-thinking-2507": "235B MoE Thinking for $0.10/1M! The ultimate bargain.",
-            "deepseek/deepseek-v3.2-exp": "Excellent on reasoning benchmarks.",
-            "qwen/qwen3-next-80b-a3b-thinking": "80B MoE thinking, affordable.",
-            "qwen/qwen3.7-max": "Qwen's top reasoning tier. 1M context.",
-            "openai/o4-mini": "Accessible OpenAI reasoning.",
-            "anthropic/claude-opus-4.8": "Anthropic's best. Pricey but unmatched depth.",
-            "openai/o3-pro": "OpenAI's most powerful reasoning model.",
-        }
+    {
+        "name": "🧠 Complex Reasoning",
+        "desc": "Math, logic, step-by-step problem solving",
+        "metric": "intelligence",
+        "filter": lambda m: "reasoning" in m["supported_parameters"],
+        "sort": "value",
+        "floor": 0.75,
     },
-    "🔍 Research / Long Documents": {
-        "desc": "Paper analysis, legal docs, long reports (requires >100K context)",
-        "models": [
-            "qwen/qwen3.7-plus",
-            "google/gemini-3.5-flash",
-            "anthropic/claude-sonnet-4.5",
-            "deepseek/deepseek-v4-pro",
-            "openai/gpt-5",
-        ],
-        "notes": {
-            "qwen/qwen3.7-plus": "🔥 1M context for $0.70. Best value for long docs.",
-            "google/gemini-3.5-flash": "Native multimodal, handles any format.",
-            "anthropic/claude-sonnet-4.5": "Most precise and thorough document analysis.",
-            "deepseek/deepseek-v4-pro": "Solid for medium docs (164K ctx).",
-            "openai/gpt-5": "OpenAI quality, 400K context.",
-        }
+    {
+        "name": "🤖 Agentic / Tool Use",
+        "desc": "Multi-step agents, function calling, computer use",
+        "metric": "agentic",
+        "filter": lambda m: "tools" in m["supported_parameters"],
+        "sort": "value",
+        "floor": 0.70,
     },
-    "🌐 Multimodal (Image/Video/Audio)": {
-        "desc": "Image analysis, charts, screenshots, video understanding",
-        "models": [
-            "qwen/qwen3-vl-235b-a22b-instruct",
-            "google/gemini-3.5-flash",
-            "qwen/qwen3-vl-30b-a3b-instruct",
-            "openai/gpt-5",
-            "anthropic/claude-sonnet-4.5",
-        ],
-        "notes": {
-            "qwen/qwen3-vl-235b-a22b-instruct": "🔥 235B MoE vision. Unbeatable price.",
-            "google/gemini-3.5-flash": "Best multimodal: text+image+audio+video natively.",
-            "qwen/qwen3-vl-30b-a3b-instruct": "Compact VL model, very cheap ($0.23/1M).",
-            "openai/gpt-5": "Image+file support, OpenAI quality.",
-            "anthropic/claude-sonnet-4.5": "Image+file support, precise analysis.",
-        }
+    {
+        "name": "🔍 Research / Long Documents",
+        "desc": "Paper analysis, long reports (context ≥ 200K)",
+        "metric": "intelligence",
+        "filter": lambda m: m["context"] >= 200_000,
+        "sort": "value",
+        "floor": 0.60,
     },
-    "⚡ Simple Tasks / High Volume": {
-        "desc": "Classification, extraction, batch processing, repetitive tasks",
-        "models": [
-            "qwen/qwen3-235b-a22b-2507",
-            "openai/gpt-5-nano",
-            "google/gemini-2.5-flash-lite",
-            "ibm-granite/granite-4.1-8b",
-            "mistralai/mistral-small-3.2-24b-instruct",
-            "meta-llama/llama-4-scout",
-        ],
-        "notes": {
-            "qwen/qwen3-235b-a22b-2507": "🔥 Cheapest on the list! 235B for $0.09/1M.",
-            "openai/gpt-5-nano": "OpenAI quality, cheap ($0.14/1M).",
-            "google/gemini-2.5-flash-lite": "Google's budget option + 1M context.",
-            "ibm-granite/granite-4.1-8b": "Extremely cheap. $0.06/1M.",
-            "mistralai/mistral-small-3.2-24b-instruct": "24B multimodal, affordable.",
-            "meta-llama/llama-4-scout": "10M context! Largest on the market.",
-        }
+    {
+        "name": "🌐 Multimodal (Image/Video/Audio input)",
+        "desc": "Image analysis, charts, screenshots, video",
+        "metric": "intelligence",
+        "filter": lambda m: bool({"image", "video", "audio"} & set(m["input_modalities"])),
+        "sort": "value",
+        "floor": 0.55,
     },
-}
+    {
+        "name": "⚡ Simple Tasks / High Volume",
+        "desc": "Cheapest models that still score ≥ 20 on intelligence",
+        "metric": "intelligence",
+        "filter": lambda m: (m["intelligence"] or 0) >= 20,
+        "sort": "price",
+    },
+]
+
+TOP_N = 10
+
+VARIANT_SUFFIXES = (":free", ":extended", ":nitro", ":floor", ":online", ":thinking", ":beta", ":batch")
 
 
-def fetch_models():
-    """Fetch all models from OpenRouter API."""
-    req = urllib.request.Request(OPENROUTER_API, headers={"User-Agent": "openrouter-ranking/1.0"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read())
-    return data["data"]
+def load_env_file(path=".env"):
+    """Populate os.environ from a local .env. CI provides real env vars instead."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def build_model_index(models_data):
-    """Build a lookup of model_id -> pricing info."""
-    index = {}
+def fetch_models(api_key=None):
+    headers = {"User-Agent": "openrouter-ranking/2.0"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = urllib.request.Request(MODELS_API, headers=headers)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read())["data"]
+
+
+def fetch_usage(api_key):
+    """Top models by token usage over the last USAGE_WINDOW_DAYS (needs an API key).
+
+    Returns {permaslug: total_tokens}. Data: OpenRouter (openrouter.ai/rankings), CC BY 4.0.
+    """
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=USAGE_WINDOW_DAYS)
+    url = f"{RANKINGS_API}?start_date={start}&end_date={end}"
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "openrouter-ranking/2.0",
+        "Authorization": f"Bearer {api_key}",
+    })
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        rows = json.loads(resp.read())["data"]
+
+    usage = {}
+    for row in rows:
+        slug = row["model_permaslug"]
+        if slug == "other":
+            continue
+        usage[slug] = usage.get(slug, 0) + int(row["total_tokens"])
+    return usage
+
+
+def match_usage_to_family(permaslug, models):
+    """Best-effort join of a rankings permaslug (e.g. `openai/gpt-4o-2024-05-13:free`)
+    onto a model family id (`openai/gpt-4o`) by longest prefix match."""
+    slug = permaslug.split(":", 1)[0]
+    if slug in models:
+        return slug
+    best = None
+    for cid in models:
+        if slug.startswith(cid) or cid.startswith(slug):
+            if best is None or len(cid) > len(best):
+                best = cid
+    return best
+
+
+def canonical_id(mid):
+    """Collapse routing/alias variants (~alias, model:variant) to one family id."""
+    if mid.startswith("~"):
+        mid = mid[1:]
+    if ":" in mid:
+        mid = mid.split(":", 1)[0]
+    return mid
+
+
+def build_index(models_data):
+    """Group variants, keep one representative per family, attach benchmark scores."""
+    families = {}
     for m in models_data:
         mid = m["id"]
-        p = m.get("pricing", {})
-        prompt = float(p.get("prompt", 0))
-        completion = float(p.get("completion", 0))
-
-        # Skip free, router-only, or invalid pricing
-        if ":free" in mid or prompt < 0 or completion < 0 or (prompt == 0 and completion == 0):
+        if mid.startswith("~"):
+            continue  # alias, not a real model
+        p = m.get("pricing") or {}
+        try:
+            prompt = float(p.get("prompt", 0))
+            completion = float(p.get("completion", 0))
+        except (TypeError, ValueError):
             continue
+        if prompt < 0 or completion < 0:
+            continue  # router / invalid pricing
+        if prompt == 0 and completion == 0:
+            continue  # genuinely free endpoints: no cost-effectiveness to rank
 
-        mixed = prompt * 750_000 + completion * 250_000
-        index[mid] = {
+        cid = canonical_id(mid)
+        cost_1m = prompt * PROMPT_TOKENS + completion * COMPLETION_TOKENS
+        aa = (m.get("benchmarks") or {}).get("artificial_analysis") or {}
+        design = (m.get("benchmarks") or {}).get("design_arena") or []
+
+        entry = {
+            "id": mid,
             "name": m["name"],
             "context": m.get("context_length", 0),
             "prompt_cost": prompt,
             "completion_cost": completion,
-            "cost_per_1M": mixed,
-            "ratio": completion / prompt if prompt > 0 else 0,
+            "cost_1m": cost_1m,
+            "intelligence": aa.get("intelligence_index"),
+            "coding": aa.get("coding_index"),
+            "agentic": aa.get("agentic_index"),
+            "design_elo": max((d.get("elo", 0) for d in design), default=None),
+            "input_modalities": (m.get("architecture") or {}).get("input_modalities") or [],
+            "supported_parameters": m.get("supported_parameters") or [],
+            "is_free_variant": mid.endswith(VARIANT_SUFFIXES),
         }
-    return index
+        # Prefer the plain family entry (no routing suffix); otherwise the cheapest variant.
+        entry["is_variant"] = mid != cid
+        prev = families.get(cid)
+        if prev is None or (prev["is_variant"] and not entry["is_variant"]) or (
+            prev["is_variant"] == entry["is_variant"] and entry["cost_1m"] < prev["cost_1m"]
+        ):
+            families[cid] = entry
+    return families
 
 
 def price_bar(cost):
     if cost < 0.15:
         return "🟢"
-    elif cost < 0.50:
+    if cost < 0.50:
         return "🟡"
-    elif cost < 1.50:
+    if cost < 1.50:
         return "🟠"
+    return "🔴"
+
+
+def rank(models, category):
+    metric = category["metric"]
+    eligible = [m for m in models.values() if category["filter"](m) and m.get(metric) is not None]
+    if not eligible:
+        return []
+    # Quality floor: keep only models within `floor` of the category's best score, so
+    # the ranking rewards value among *competitive* models rather than the absolute
+    # cheapest weak model.
+    floor = category.get("floor", 0.0)
+    best_score = max(m[metric] for m in eligible)
+    candidates = [m for m in eligible if m[metric] >= floor * best_score]
+    if category["sort"] == "price":
+        candidates.sort(key=lambda m: (m["cost_1m"], -m[metric]))
     else:
-        return "🔴"
+        candidates.sort(key=lambda m: m["cost_1m"] / m[metric])
+    return candidates[:TOP_N]
 
 
-def format_price(price_per_token):
-    """Format price per token to display as $X.XX/1M tokens equivalent in cents."""
-    cost_1M = price_per_token * 1_000_000
-    if cost_1M < 0.01:
-        return f"${cost_1M:.4f}"
-    elif cost_1M < 1:
-        return f"${cost_1M:.2f}¢"
-    else:
-        return f"${cost_1M:.2f}"
+def fmt_cost(m):
+    return f"{price_bar(m['cost_1m'])} ${m['cost_1m']:.3f}"
 
 
-def generate_tables(model_index):
-    """Generate markdown tables for each task category."""
-    sections = []
-
-    for task_name, task_info in TASKS.items():
-        lines = []
-        lines.append(f"## {task_name}")
-        lines.append(f"_{task_info['desc']}_")
-        lines.append("")
-        lines.append("| # | Model | $/1M Tokens | Prompt (¢/1M) | Compl (¢/1M) | P/C | Context | Notes |")
-        lines.append("|---|--------|------------|--------------|--------------|-----|----------|------|")
-
-        for i, mid in enumerate(task_info["models"]):
-            m = model_index.get(mid)
-            if not m:
-                continue
-
-            star = "⭐" if i < 3 else ""
-            bar = price_bar(m["cost_per_1M"])
-            note = task_info["notes"].get(mid, "")
-
-            lines.append(
-                f"| {star} {i+1} | `{mid}` | {bar} ${m['cost_per_1M']:.4f} | "
-                f"${m['prompt_cost']*1_000_000:.2f} | ${m['completion_cost']*1_000_000:.2f} | "
-                f"{m['ratio']:.1f}x | {m['context']:,} | {note} |"
-            )
-
-        lines.append("")
-        sections.append("\n".join(lines))
-
-    return sections
+def render_table(category, ranked, models):
+    metric = category["metric"]
+    label = {"intelligence": "Intelligence", "coding": "Coding", "agentic": "Agentic"}[metric]
+    out = [f"## {category['name']}", f"_{category['desc']}_", ""]
+    out.append(f"| # | Model | $/1M | {label} idx | {'Value' if category['sort']=='value' else 'idx/$'} | Context | In |")
+    out.append("|---|-------|------|-----------|-------|---------|----|")
+    for i, m in enumerate(ranked, 1):
+        score = m[metric]
+        value = score / m["cost_1m"]
+        inputs = "+".join(m["input_modalities"]) or "text"
+        star = "⭐ " if i <= 3 else ""
+        out.append(
+            f"| {star}{i} | `{m['id']}` | {fmt_cost(m)} | {score:.1f} | "
+            f"{value:,.0f} | {m['context']:,} | {inputs} |"
+        )
+    out.append("")
+    return "\n".join(out)
 
 
-def generate_summary(model_index):
-    """Generate executive summary with top picks."""
-    top_models = [
-        ("🥇 Best Overall", "deepseek/deepseek-v4-pro", "Best quality/price ratio across all categories."),
-        ("🥈 Best Bargain", "qwen/qwen3-235b-a22b-2507", "235B parameters (MoE) for only $0.09/1M tokens."),
-        ("🥉 Best All-Rounder", "qwen/qwen3.7-plus", "1M context, multimodal, versatile at $0.70/1M."),
+def render_top_overall(models):
+    scored = [m for m in models.values() if m["intelligence"] is not None]
+    best_abs = max(scored, key=lambda m: m["intelligence"])
+    # "Best value" only among models within 60% of the top score, so it reflects a
+    # strong model rather than the cheapest weak one.
+    competitive = [m for m in scored if m["intelligence"] >= 0.6 * best_abs["intelligence"]]
+    best_value = max(competitive, key=lambda m: m["intelligence"] / m["cost_1m"])
+    cheapest = min((m for m in models.values() if (m["intelligence"] or 0) >= 20), key=lambda m: m["cost_1m"])
+    rows = [
+        ("🥇 Best value", best_value, f"{best_value['intelligence']:.0f} intelligence for {best_value['cost_1m']:.3f}/1M"),
+        ("🥈 Highest score", best_abs, f"{best_abs['intelligence']:.0f} intelligence (absolute top)"),
+        ("🥉 Cheapest usable", cheapest, f"${cheapest['cost_1m']:.3f}/1M at {cheapest['intelligence']:.0f} intelligence"),
     ]
-
-    lines = [
-        "## 🏆 Top 3 Overall",
-        "",
-        "| Position | Model | Why |",
-        "|----------|------|-----|",
-    ]
-    for pos, mid, reason in top_models:
-        m = model_index.get(mid, {})
-        price = f"${m.get('cost_per_1M', 0):.2f}/1M" if m else "N/A"
-        lines.append(f"| {pos} | `{mid}` ({price}) | {reason} |")
-
-    lines.append("")
-    return "\n".join(lines)
+    out = ["## 🏆 Top Picks (computed, not curated)", "", "| | Model | Why |", "|---|-------|-----|"]
+    for pos, m, why in rows:
+        out.append(f"| {pos} | `{m['id']}` | {why} |")
+    out.append("")
+    return "\n".join(out)
 
 
-def generate_cheatsheet():
-    """Generate the quick-reference cheat sheet."""
-    tips = [
-        ("💸 Cheapest possible?", "`qwen/qwen3-235b-a22b-2507` ($0.09/M) and `qwen/qwen3-235b-a22b-thinking-2507` ($0.10/M)"),
-        ("⭐ Best all-rounder?", "`deepseek/deepseek-v4-pro` ($0.54/M) — does everything well"),
-        ("📚 Need 1M context?", "`qwen/qwen3.7-plus` ($0.70/M)"),
-        ("💻 Code?", "`qwen/qwen3-coder-flash` ($0.39/M) or `qwen/qwen3-coder` ($0.62/M)"),
-        ("👁️ Multimodal / Vision?", "`qwen/qwen3-vl-235b-a22b-instruct` ($0.37/M)"),
-        ("🏔️ No budget limit?", "`anthropic/claude-sonnet-4.5` ($6/M) or `openai/gpt-5` ($3.44/M)"),
-    ]
-
-    lines = [
-        "## 💡 Quick Recommendations",
-        "",
-        "| Scenario | Best Pick |",
-        "|----------|-----------|",
-    ]
-    for scenario, pick in tips:
-        lines.append(f"| {scenario} | {pick} |")
-
-    lines.append("")
-    return "\n".join(lines)
+def render_usage_section(usage, models, top=15):
+    """What people actually run, vs. what's best value."""
+    ranked = sorted(usage.items(), key=lambda kv: kv[1], reverse=True)[:top]
+    if not ranked:
+        return None
+    total = sum(usage.values())
+    out = [f"## 📈 Most Used (last {USAGE_WINDOW_DAYS} days, by tokens)", "",
+           "_Real OpenRouter traffic — what is actually being run, not what is best value._", "",
+           "| # | Model | Share | $/1M | Intelligence |", "|---|-------|-------|------|--------------|"]
+    for i, (slug, tokens) in enumerate(ranked, 1):
+        cid = match_usage_to_family(slug, models)
+        m = models.get(cid) if cid else None
+        share = f"{100 * tokens / total:.1f}%" if total else "?"
+        cost = f"${m['cost_1m']:.3f}" if m else "—"
+        intel = f"{m['intelligence']:.1f}" if m and m["intelligence"] is not None else "—"
+        out.append(f"| {i} | `{slug}` | {share} | {cost} | {intel} |")
+    out.append("")
+    return "\n".join(out)
 
 
-def main():
-    print("🔄 Fetching models from OpenRouter API...", file=sys.stderr)
-    models_data = fetch_models()
-    model_index = build_model_index(models_data)
-    print(f"✅ Loaded {len(model_index)} paid models", file=sys.stderr)
+def build_readme(models, now, total_models, usage=None):
+    scored = sum(1 for m in models.values() if m["intelligence"] is not None)
+    sections = [render_top_overall(models)]
+    if usage:
+        usage_section = render_usage_section(usage, models)
+        if usage_section:
+            sections.append(usage_section)
+    for cat in CATEGORIES:
+        ranked = rank(models, cat)
+        if ranked:
+            sections.append(render_table(cat, ranked, models))
 
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    total_models = len(models_data)
+    return f"""# 🏆 OpenRouter LLM Cost-Effectiveness Ranking
 
-    tables = generate_tables(model_index)
-    summary = generate_summary(model_index)
-    cheatsheet = generate_cheatsheet()
-    joined_tables = "\n\n---\n\n".join(tables)
-
-    readme = f"""# 🏆 OpenRouter LLM Cost-Effectiveness Ranking
-
-[![Update Ranking](https://github.com/Draxo-io/openrouter-ranking/actions/workflows/update-ranking.yml/badge.svg)](https://github.com/Draxo-io/openrouter-ranking/actions/workflows/update-ranking.yml)
-[![Last Updated](https://img.shields.io/badge/updated-{now.replace(' ', '%20')}-blue)](https://github.com/Draxo-io/openrouter-ranking)
-
-> **Updated:** {now}  
-> **Total models on OpenRouter:** {total_models}  
-> **Paid models analyzed:** {len(model_index)}  
-> **Methodology:** Price per 1M tokens (750K prompt + 250K completion). Data via [OpenRouter API](https://openrouter.ai/api/v1/models).
+> **Updated:** {now}
+> **Models on OpenRouter:** {total_models} · **Families priced:** {len(models)} · **With benchmark scores:** {scored}
+> **Methodology:** value = benchmark index ÷ blended price per 1M tokens ({PROMPT_TOKENS // 1000}K prompt + {COMPLETION_TOKENS // 1000}K completion). Data via [OpenRouter API]({MODELS_API}).
 
 ---
 
-## 📖 About
+## 📖 How this works
 
-This ranking is generated **automatically every week** and orders models available on [OpenRouter](https://openrouter.ai) by **cost-effectiveness**, organized by real-world use cases:
+Every category below is defined by a **rule** (a benchmark metric plus a filter),
+not by a hand-picked list. Any model that OpenRouter ships is scored automatically:
 
-- 💬 Daily chat and general assistant
-- 💻 Programming and code
-- 🧠 Complex reasoning (math, logic)
-- 🔍 Research and long document analysis
-- 🌐 Multimodal (image, video, audio)
-- ⚡ Simple tasks and high volume
+- **Effectiveness** ← Artificial Analysis indices (`intelligence`, `coding`, `agentic`)
+  and Design Arena ELO, embedded in each model object from the API.
+- **Cost** ← live pricing from the same response.
+- Categories filter on capabilities from the API: `supported_parameters` (tools,
+  reasoning), `context_length`, and `architecture.input_modalities`.
 
-**Prices in USD.** Symbols: 🟢 cheap (<$0.15/M) 🟡 medium ($0.15-$0.50/M) 🟠 premium ($0.50-$1.50/M) 🔴 elite (>$1.50/M).
+Add a model to OpenRouter → it shows up here on the next run. No code change.
 
-⭐ = Top 3 recommendations per category.
-
----
-
-{summary}
+**Prices in USD per 1M tokens (blended).** 🟢 <$0.15 · 🟡 <$0.50 · 🟠 <$1.50 · 🔴 ≥$1.50.
+`In` = accepted input modalities.
 
 ---
 
-{cheatsheet}
-
----
-
-{joined_tables}
+""" + "\n\n---\n\n".join(sections) + f"""
 
 ---
 
 ## 🔧 Methodology
 
-- **Source:** [OpenRouter API](https://openrouter.ai/api/v1/models) (real-time data)
-- **Cost formula:** `(prompt_price × 750,000) + (completion_price × 250,000)` = cost per 1M tokens
-- **Ratio:** Assumes 75% prompt / 25% completion (typical chat usage)
-- **Ranking:** Ordered by cost-effectiveness within each category, not just price
-- **Updates:** Weekly (via GitHub Actions)
+- **Source:** [OpenRouter API]({MODELS_API}) — live catalog incl. benchmark scores
+- **Cost formula:** `prompt_price × {PROMPT_TOKENS:,} + completion_price × {COMPLETION_TOKENS:,}`
+- **Value:** `benchmark_index / cost_per_1M` (higher is better); ranked descending
+- **Family collapse:** routing/alias variants (`:free`, `:nitro`, `~alias`) are merged
+  into their base model family, keeping the cheapest representative
+- **Coverage:** models without a benchmark score are skipped in metric-based
+  categories rather than guessed at
+- **Updates:** weekly via GitHub Actions
+
+---
+
+*Data source: OpenRouter (openrouter.ai). Usage figures from openrouter.ai/rankings (CC BY 4.0, as of {now}). Fork of Draxo-io/openrouter-ranking.*
 
 ---
 
 ## 🤖 Automation
 
-This repository is updated automatically via:
-- **GitHub Actions:** Every Monday at 12:00 UTC
-- **Hermes Agent:** Weekly cron job that generates and publishes the ranking
-
-To run manually: `python generate_ranking.py`
-
----
-
-*Created by [@Draxo-io](https://github.com/Draxo-io) · [draxo.io](https://draxo.io)*
+Generated weekly by GitHub Actions (`.github/workflows/update-ranking.yml`).
+Run manually: `python generate_ranking.py` (set `OPENROUTER_API_KEY` for the usage section).
 """
 
-    output = sys.argv[1] if len(sys.argv) > 1 else OUTPUT_FILE
-    with open(output, "w") as f:
-        f.write(readme)
 
-    print(f"✅ Written to {output}", file=sys.stderr)
+def main():
+    load_env_file()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--output", default="README.md")
+    ap.add_argument("--api-key", default=os.environ.get("OPENROUTER_API_KEY"),
+                    help="or set OPENROUTER_API_KEY; only needed for the usage section")
+    args = ap.parse_args()
+
+    print("🔄 Fetching live catalog from OpenRouter…", file=sys.stderr)
+    data = fetch_models(args.api_key)
+    models = build_index(data)
+    print(f"✅ {len(data)} models → {len(models)} priced families", file=sys.stderr)
+
+    usage = None
+    if args.api_key:
+        try:
+            usage = fetch_usage(args.api_key)
+            print(f"✅ Usage data: {len(usage)} models over {USAGE_WINDOW_DAYS} days", file=sys.stderr)
+        except Exception as e:
+            print(f"⚠️  Usage section skipped ({e})", file=sys.stderr)
+    else:
+        print("ℹ️  No API key → skipping usage section (set OPENROUTER_API_KEY)", file=sys.stderr)
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    readme = build_readme(models, now, len(data), usage)
+    with open(args.output, "w") as f:
+        f.write(readme)
+    print(f"✅ Written to {args.output}", file=sys.stderr)
 
 
 if __name__ == "__main__":
