@@ -45,14 +45,68 @@ case "$(uname -s)" in
     echo "  → takes effect after the next login (or launch Goose from a shell)"
 
     # Desktop launcher override: GNOME menu launches don't inherit shell env.
-    # A wrapper keeps the JSON out of the .desktop quoting rules entirely.
+    # The wrapper also refreshes the model list from the repo on every launch.
     if [ -f /usr/share/applications/goose.desktop ]; then
       WRAPPER="$GOOSE_DIR/launch-goose-with-models.sh"
       mkdir -p "$HOME/.local/share/applications"
       cat > "$WRAPPER" <<WRAP
 #!/usr/bin/env bash
-export GOOSE_PREDEFINED_MODELS="\$(cat "$MIN")"
-exec /usr/lib/goose/Goose "\$@"
+# Auto-updating Goose launcher.
+# Pulls the latest curated OpenRouter models from the repo, then starts Goose
+# with GOOSE_PREDEFINED_MODELS set. A failed download never blocks startup —
+# the last good copy is reused.
+set -u
+
+REPO_RAW="https://raw.githubusercontent.com/pcace/openrouter-ranking/main/goose"
+LOCAL_REPO="$REPO_DIR"
+GOOSE_CFG="\${GOOSE_CONFIG_DIR:-\$HOME/.config/goose}"
+CACHE="\${XDG_CACHE_HOME:-\$HOME/.cache}/goose-openrouter"
+GOOSE_BIN="\${GOOSE_BIN:-/usr/lib/goose/Goose}"
+
+mkdir -p "\$CACHE" "\$GOOSE_CFG/custom_providers"
+
+fetch() { # \$1=url \$2=dest ; keeps any previous file if the download fails
+  local tmp
+  tmp="\$(mktemp "\$CACHE/.dl.XXXXXX")"
+  if curl -fsSL --max-time 15 "\$1" -o "\$tmp" 2>/dev/null && [ -s "\$tmp" ]; then
+    mv "\$tmp" "\$2"
+    return 0
+  fi
+  rm -f "\$tmp"
+  return 1
+}
+
+fetch "\$REPO_RAW/predefined_models.min.json" "\$CACHE/predefined_models.min.json" \\
+  || cp -f "\$LOCAL_REPO/goose/predefined_models.min.json" "\$CACHE/" 2>/dev/null || true
+fetch "\$REPO_RAW/openrouter_code.json" "\$CACHE/openrouter_code.json" \\
+  || cp -f "\$LOCAL_REPO/goose/openrouter_code.json" "\$CACHE/" 2>/dev/null || true
+
+if [ -s "\$CACHE/openrouter_code.json" ]; then
+  cp -f "\$CACHE/openrouter_code.json" "\$GOOSE_CFG/custom_providers/openrouter_code.json"
+fi
+
+# If the configured default model vanished from the refreshed list, fall back
+# to the first entry so Goose can still start a session.
+if command -v python3 >/dev/null 2>&1 && [ -s "\$GOOSE_CFG/config.yaml" ] \\
+   && [ -s "\$GOOSE_CFG/custom_providers/openrouter_code.json" ]; then
+  python3 - "\$GOOSE_CFG/config.yaml" "\$GOOSE_CFG/custom_providers/openrouter_code.json" <<'PY' || true
+import json, sys, yaml
+cfg_path, prov_path = sys.argv[1], sys.argv[2]
+cfg = yaml.safe_load(open(cfg_path)) or {}
+names = [m["name"] for m in json.load(open(prov_path))["models"]]
+entry = (cfg.get("providers") or {}).get("openrouter_code")
+if entry and names and entry.get("model") not in names:
+    entry["model"] = names[0]
+    with open(cfg_path, "w") as f:
+        yaml.safe_dump(cfg, f, sort_keys=False, allow_unicode=True)
+PY
+fi
+
+if [ -s "\$CACHE/predefined_models.min.json" ]; then
+  export GOOSE_PREDEFINED_MODELS="\$(cat "\$CACHE/predefined_models.min.json")"
+fi
+
+exec "\$GOOSE_BIN" "\$@"
 WRAP
       chmod +x "$WRAPPER"
       cat > "$HOME/.local/share/applications/goose.desktop" <<DESK
