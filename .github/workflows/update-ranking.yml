@@ -42,7 +42,9 @@ jobs:
       - name: Generate Goose config
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: python generate_goose_config.py
+        # --verify probes every candidate, so models the account cannot reach
+        # (e.g. excluded by a zero-data-retention rule) never land in the picker.
+        run: python generate_goose_config.py --verify
 
       - name: Commit and push if changed
         run: |

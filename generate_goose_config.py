@@ -84,7 +84,9 @@ COMPLETION_TOKENS = 250_000
 def _get_json(url, api_key=None):
     headers = {"User-Agent": "openrouter-ranking/goose-config"}
     if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+        # keys copied around often carry a trailing newline — a raw one breaks
+        # the header ("Invalid header value") and silently drops the usage data
+        headers["Authorization"] = f"Bearer {api_key.strip()}"
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read())
@@ -322,7 +324,7 @@ def probe_available(model, api_key, timeout=60):
         "max_tokens": 1,
     }).encode()
     req = urllib.request.Request(CHAT_API, data=payload, headers={
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {api_key.strip()}",
         "Content-Type": "application/json",
         "User-Agent": "openrouter-ranking/goose-config",
     })
