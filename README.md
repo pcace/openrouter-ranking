@@ -1,6 +1,6 @@
 # 🏆 OpenRouter LLM Cost-Effectiveness Ranking
 
-> **Updated:** 2026-10-19 19:18 UTC
+> **Updated:** 2026-10-19 19:19 UTC
 > **Models on OpenRouter:** 470 · **Families priced:** 346 · **With benchmark scores:** 213
 > **Methodology:** value = benchmark index ÷ blended price per 1M tokens (750K prompt + 250K completion). Data via [OpenRouter API](https://openrouter.ai/api/v1/models).
 
@@ -260,7 +260,7 @@ _Fastest-growing apps on OpenRouter by token growth vs. prior windows._
 | 14 | Proto Agent | 1,866,291,166,958 | 4,843,131 |
 | 15 | HighLevel | 1,676,847,705,222 | 30,420,234 |
 
-*Source: OpenRouter (openrouter.ai/apps), as of 2026-10-19T19:18:18.871Z — CC BY 4.0.*
+*Source: OpenRouter (openrouter.ai/apps), as of 2026-10-19T19:19:33.015Z — CC BY 4.0.*
 
 
 ---
@@ -278,7 +278,7 @@ _Fastest-growing apps on OpenRouter by token growth vs. prior windows._
 
 ---
 
-*Data source: OpenRouter (openrouter.ai). Usage figures from openrouter.ai/rankings (CC BY 4.0, as of 2026-10-19 19:18 UTC). Fork of Draxo-io/openrouter-ranking.*
+*Data source: OpenRouter (openrouter.ai). Usage figures from openrouter.ai/rankings (CC BY 4.0, as of 2026-10-19 19:19 UTC). Fork of Draxo-io/openrouter-ranking.*
 
 ---
 
