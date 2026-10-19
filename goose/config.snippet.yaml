@@ -2,5 +2,5 @@
 providers:
   openrouter_code:
     enabled: true
-    model: deepseek/deepseek-v4.1-flash
+    model: inclusionai/ling-3.0-flash
     configured: true

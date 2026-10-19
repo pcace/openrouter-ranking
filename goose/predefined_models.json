@@ -1,9 +1,17 @@
 [
   {
+    "name": "inclusionai/ling-3.0-flash",
+    "provider": "openrouter_code",
+    "alias": "Ling 3.0 Flash",
+    "subtext": "$0.03/1M \u00b7 262K ctx \u00b7 code 51",
+    "context_limit": 262144,
+    "reasoning": true
+  },
+  {
     "name": "deepseek/deepseek-v4.1-flash",
     "provider": "openrouter_code",
     "alias": "DeepSeek V4.1 Flash",
-    "subtext": "$0.04/1M \u00b7 1M ctx \u00b7 iq 25 \u00b7 36.6T tok/7d \u00b7 22.3% \u00b7 in: img",
+    "subtext": "$0.04/1M \u00b7 1M ctx \u00b7 iq 25 \u00b7 in: img",
     "context_limit": 1048576,
     "reasoning": true
   },
@@ -11,55 +19,23 @@
     "name": "z-ai/glm-5.3-flash",
     "provider": "openrouter_code",
     "alias": "GLM 5.3 Flash",
-    "subtext": "$0.08/1M \u00b7 1M ctx \u00b7 code 72 \u00b7 12.2T tok/7d \u00b7 7.5% \u00b7 in: img+vid",
+    "subtext": "$0.08/1M \u00b7 1M ctx \u00b7 code 72 \u00b7 in: img+vid",
     "context_limit": 1048576,
     "reasoning": true
   },
   {
-    "name": "inclusionai/ling-3.1-flash",
+    "name": "deepseek/deepseek-v4-flash-vision-exp",
     "provider": "openrouter_code",
-    "alias": "Ling 3.1 Flash",
-    "subtext": "$0.11/1M \u00b7 262K ctx \u00b7 iq 41 \u00b7 190.0B tok/7d \u00b7 0.1%",
-    "context_limit": 262144,
-    "reasoning": true
-  },
-  {
-    "name": "deepseek/deepseek-v4-flash",
-    "provider": "openrouter_code",
-    "alias": "DeepSeek V4 Flash 0423",
-    "subtext": "$0.11/1M \u00b7 1M ctx \u00b7 code 52 \u00b7 7.7T tok/7d \u00b7 4.7%",
+    "alias": "DeepSeek V4 Flash Vision Exp",
+    "subtext": "$0.32/1M \u00b7 1M ctx \u00b7 code 65 \u00b7 in: img",
     "context_limit": 1048576,
-    "reasoning": true
-  },
-  {
-    "name": "xiaomi/mimo-v2.6-flash",
-    "provider": "openrouter_code",
-    "alias": "MiMo V2.6 Flash",
-    "subtext": "$0.18/1M \u00b7 1.1M ctx \u00b7 iq 38 \u00b7 9.9T tok/7d \u00b7 6.1% \u00b7 in: img+vid+aud",
-    "context_limit": 1050000,
-    "reasoning": true
-  },
-  {
-    "name": "z-ai/glm-5.3",
-    "provider": "openrouter_code",
-    "alias": "GLM 5.3",
-    "subtext": "$0.41/1M \u00b7 1M ctx \u00b7 code 75 \u00b7 5.2T tok/7d \u00b7 3.2%",
-    "context_limit": 1048576,
-    "reasoning": true
-  },
-  {
-    "name": "openai/gpt-5.6-luna",
-    "provider": "openrouter_code",
-    "alias": "OpenAI GPT 5.6 Luna",
-    "subtext": "$0.45/1M \u00b7 1.1M ctx \u00b7 code 71 \u00b7 1.7T tok/7d \u00b7 1.0% \u00b7 in: pdf+img",
-    "context_limit": 1050000,
     "reasoning": true
   },
   {
     "name": "google/gemini-3.8-flash",
     "provider": "openrouter_code",
     "alias": "Gemini 3.8 Flash",
-    "subtext": "$1.65/1M \u00b7 1M ctx \u00b7 code 76 \u00b7 1.8T tok/7d \u00b7 1.1% \u00b7 in: img+vid+pdf+aud",
+    "subtext": "$1.65/1M \u00b7 1M ctx \u00b7 code 76 \u00b7 in: img+vid+pdf+aud",
     "context_limit": 1048576,
     "reasoning": true
   },
