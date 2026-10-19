@@ -14,7 +14,7 @@ cp "$SRC/openrouter_code.json" "$GOOSE_DIR/custom_providers/openrouter_code.json
 echo "✓ provider → $GOOSE_DIR/custom_providers/openrouter_code.json"
 
 python3 - "$GOOSE_DIR/config.yaml" "$SRC/config.snippet.yaml" <<'PY'
-import datetime, shutil, sys, yaml
+import datetime, os, shutil, sys, yaml
 cfg_path, snip_path = sys.argv[1], sys.argv[2]
 snippet = yaml.safe_load(open(snip_path))["providers"]
 try:
@@ -22,7 +22,7 @@ try:
 except FileNotFoundError:
     cfg = {}
 cfg.setdefault("providers", {}).update(snippet)
-if cfg:
+if cfg and os.path.exists(cfg_path):
     backup = f"{cfg_path}.bak-{datetime.datetime.now():%Y%m%d%H%M%S}"
     shutil.copy2(cfg_path, backup)
     print(f"✓ merged providers entry into {cfg_path} (backup: {backup})")
@@ -48,6 +48,9 @@ case "$(uname -s)" in
     # The wrapper also refreshes the model list from the repo on every launch.
     if [ -f /usr/share/applications/goose.desktop ]; then
       WRAPPER="$GOOSE_DIR/launch-goose-with-models.sh"
+      MODEL_MODE="${GOOSE_MODEL_MODE:-curated}"
+      NEWEST="${GOOSE_NEWEST_COUNT:-5}"
+      EXTRA_MODELS="${GOOSE_EXTRA_MODELS:-}"
       GOOSE_BIN_RESOLVED="$(command -v goose 2>/dev/null || true)"
       if [ -z "$GOOSE_BIN_RESOLVED" ]; then
         for _c in /usr/lib/goose/Goose /opt/homebrew/bin/goose /usr/local/bin/goose \
@@ -60,9 +63,9 @@ case "$(uname -s)" in
       cat > "$WRAPPER" <<WRAP
 #!/usr/bin/env bash
 # Auto-updating Goose launcher.
-# Pulls the latest curated OpenRouter models from the repo, then starts Goose
-# with GOOSE_PREDEFINED_MODELS set. A failed download never blocks startup —
-# the last good copy is reused.
+# Refreshes the OpenRouter model list, then starts Goose with
+# GOOSE_PREDEFINED_MODELS set. The refresh never blocks startup — anything that
+# fails falls back to the last good copy on disk.
 set -u
 
 REPO_RAW="https://raw.githubusercontent.com/pcace/openrouter-ranking/main/goose"
@@ -70,6 +73,10 @@ LOCAL_REPO="$REPO_DIR"
 GOOSE_CFG="\${GOOSE_CONFIG_DIR:-\$HOME/.config/goose}"
 CACHE="\${XDG_CACHE_HOME:-\$HOME/.cache}/goose-openrouter"
 GOOSE_BIN="\${GOOSE_BIN:-$GOOSE_BIN_RESOLVED}"
+MODE="\${GOOSE_MODEL_MODE:-$MODEL_MODE}"
+NEWEST="\${GOOSE_NEWEST_COUNT:-$NEWEST}"
+EXTRA="\${GOOSE_EXTRA_MODELS:-$EXTRA_MODELS}"
+REFRESH_MIN="\${GOOSE_MODEL_REFRESH_MIN:-360}"
 
 if [ -z "\$GOOSE_BIN" ]; then
   echo "✗ goose binary nicht gefunden — bitte GOOSE_BIN setzen"
@@ -89,10 +96,38 @@ fetch() { # \$1=url \$2=dest ; keeps any previous file if the download fails
   return 1
 }
 
-fetch "\$REPO_RAW/predefined_models.min.json" "\$CACHE/predefined_models.min.json" \\
-  || cp -f "\$LOCAL_REPO/goose/predefined_models.min.json" "\$CACHE/" 2>/dev/null || true
-fetch "\$REPO_RAW/openrouter_code.json" "\$CACHE/openrouter_code.json" \\
-  || cp -f "\$LOCAL_REPO/goose/openrouter_code.json" "\$CACHE/" 2>/dev/null || true
+stale() { [ ! -s "\$1" ] || [ -n "\$(find "\$1" -mmin +"\$REFRESH_MIN" 2>/dev/null)" ]; }
+
+# API key for the probe: from the environment, else from Goose's own secret
+# store (same key the provider uses), so --verify can tell whether a freshly
+# released model is actually usable for this account.
+GOOSE_KEY="\${OPENROUTER_API_KEY:-}"
+if [ -z "\$GOOSE_KEY" ] && command -v secret-tool >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+  GOOSE_KEY="\$(secret-tool lookup service goose 2>/dev/null \\
+    | python3 -c 'import json,sys;print(json.load(sys.stdin).get("OPENROUTER_API_KEY",""))' 2>/dev/null || true)"
+fi
+
+GENERATED=0
+if stale "\$CACHE/openrouter_code.json" && command -v python3 >/dev/null 2>&1 \\
+   && [ -f "\$LOCAL_REPO/generate_goose_config.py" ]; then
+  # Preferred path: rebuild the list locally from the live OpenRouter catalog,
+  # so the picker really holds the newest models instead of last week's.
+  ALSO_ARGS=""
+  for _m in \$(echo "\$EXTRA" | tr ',' ' '); do
+    ALSO_ARGS="\$ALSO_ARGS --also \$_m"
+  done
+  if ( cd "\$LOCAL_REPO" && OPENROUTER_API_KEY="\$GOOSE_KEY" python3 generate_goose_config.py \\
+         --mode "\$MODE" --newest "\$NEWEST" --verify \$ALSO_ARGS --out "\$CACHE" ) >/dev/null 2>&1; then
+    GENERATED=1
+  fi
+fi
+
+if [ "\$GENERATED" != 1 ] && stale "\$CACHE/openrouter_code.json"; then
+  fetch "\$REPO_RAW/predefined_models.min.json" "\$CACHE/predefined_models.min.json" \\
+    || cp -f "\$LOCAL_REPO/goose/predefined_models.min.json" "\$CACHE/" 2>/dev/null || true
+  fetch "\$REPO_RAW/openrouter_code.json" "\$CACHE/openrouter_code.json" \\
+    || cp -f "\$LOCAL_REPO/goose/openrouter_code.json" "\$CACHE/" 2>/dev/null || true
+fi
 
 if [ -s "\$CACHE/openrouter_code.json" ]; then
   cp -f "\$CACHE/openrouter_code.json" "\$GOOSE_CFG/custom_providers/openrouter_code.json"
@@ -149,7 +184,7 @@ for _f in "$HOME/.zshrc" "$HOME/.bashrc"; do
   fi
 done
 if [ -n "${SHELLRC:-}" ] && ! grep -qF "GOOSE_PREDEFINED_MODELS" "$SHELLRC"; then
-  printf '\n# Goose: curated OpenRouter models with prices (auto-updated)\nexport GOOSE_PREDEFINED_MODELS="$(cat %s)"\n' "$MIN" >> "$SHELLRC"
+  printf '\n# Goose: newest OpenRouter models with prices (auto-updated)\nexport GOOSE_PREDEFINED_MODELS="$(cat %s)"\n' "$MIN" >> "$SHELLRC"
   echo "✓ export added to $SHELLRC"
 fi
 

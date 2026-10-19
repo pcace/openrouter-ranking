@@ -1,36 +1,45 @@
 {
   "name": "openrouter_code",
   "engine": "openai",
-  "display_name": "OpenRouter \u00b7 Code",
-  "description": "Curated OpenRouter coding models, regenerated weekly.",
+  "display_name": "OpenRouter \u00b7 Best Value",
+  "description": "Affordable, widely used OpenRouter models \u2014 cheap value picks plus one or two strong ones.",
   "api_key_env": "OPENROUTER_API_KEY",
   "base_url": "https://openrouter.ai/api/v1",
   "models": [
     {
-      "name": "inclusionai/ling-3.0-flash-vl",
-      "context_limit": 262144,
-      "input_token_cost": 2.1e-08,
-      "output_token_cost": 6.16e-08,
+      "name": "deepseek/deepseek-v4.1-flash",
+      "context_limit": 1048576,
+      "input_token_cost": 3.04e-08,
+      "output_token_cost": 8e-08,
       "currency": null,
       "supports_cache_control": true,
       "reasoning": true
     },
     {
-      "name": "inclusionai/ling-3.0-flash",
-      "context_limit": 262144,
-      "input_token_cost": 2.1e-08,
-      "output_token_cost": 6.3e-08,
+      "name": "z-ai/glm-5.3-flash",
+      "context_limit": 1048576,
+      "input_token_cost": 4.8e-08,
+      "output_token_cost": 1.6e-07,
       "currency": null,
       "supports_cache_control": true,
       "reasoning": true
     },
     {
-      "name": "openai/gpt-oss-120b",
-      "context_limit": 131072,
-      "input_token_cost": 3.7e-08,
-      "output_token_cost": 1.7e-07,
+      "name": "inclusionai/ling-3.1-flash",
+      "context_limit": 262144,
+      "input_token_cost": 7.5e-08,
+      "output_token_cost": 2.25e-07,
       "currency": null,
-      "supports_cache_control": null,
+      "supports_cache_control": true,
+      "reasoning": true
+    },
+    {
+      "name": "deepseek/deepseek-v4-flash",
+      "context_limit": 1048576,
+      "input_token_cost": 9.1e-08,
+      "output_token_cost": 1.82e-07,
+      "currency": null,
+      "supports_cache_control": true,
       "reasoning": true
     },
     {
@@ -43,55 +52,37 @@
       "reasoning": true
     },
     {
-      "name": "anthropic/claude-haiku-5.5",
-      "context_limit": 1000000,
-      "input_token_cost": 1e-07,
-      "output_token_cost": 5e-07,
-      "currency": null,
-      "supports_cache_control": true,
-      "reasoning": true
-    },
-    {
-      "name": "deepseek/deepseek-v4.1-flash",
+      "name": "z-ai/glm-5.3",
       "context_limit": 1048576,
-      "input_token_cost": 1.5e-07,
-      "output_token_cost": 6e-07,
+      "input_token_cost": 7.9e-08,
+      "output_token_cost": 1.4e-06,
       "currency": null,
       "supports_cache_control": true,
       "reasoning": true
     },
     {
-      "name": "tencent/hy3-preview",
-      "context_limit": 262144,
-      "input_token_cost": 1.8e-07,
-      "output_token_cost": 6e-07,
-      "currency": null,
-      "supports_cache_control": true,
-      "reasoning": true
-    },
-    {
-      "name": "z-ai/glm-5.3-flash",
-      "context_limit": 1048576,
-      "input_token_cost": 2.32e-08,
+      "name": "openai/gpt-5.6-luna",
+      "context_limit": 1050000,
+      "input_token_cost": 2e-07,
       "output_token_cost": 1.2e-06,
       "currency": null,
       "supports_cache_control": true,
       "reasoning": true
     },
     {
-      "name": "z-ai/glm-5.3",
+      "name": "google/gemini-3.8-flash",
       "context_limit": 1048576,
-      "input_token_cost": 8.9e-08,
-      "output_token_cost": 4.8e-06,
+      "input_token_cost": 8.25e-07,
+      "output_token_cost": 4.125e-06,
       "currency": null,
       "supports_cache_control": true,
       "reasoning": true
     },
     {
-      "name": "openai/gpt-5.6-sol",
-      "context_limit": 1050000,
+      "name": "x-ai/grok-4.6",
+      "context_limit": 500000,
       "input_token_cost": 2e-06,
-      "output_token_cost": 1e-05,
+      "output_token_cost": 6e-06,
       "currency": null,
       "supports_cache_control": true,
       "reasoning": true

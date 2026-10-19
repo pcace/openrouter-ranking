@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
 """
-Goose config generator for OpenRouter coding models.
+Goose config generator for OpenRouter models.
 
 Produces, from the live OpenRouter catalog, everything needed to keep a Goose
 setup current: a custom provider with correct context/pricing, and a
 GOOSE_PREDEFINED_MODELS payload so the model picker shows a readable name plus
 price/context per model.
+
+Two selection modes (--mode):
+
+  curated  (default) affordable models people actually run: pinned daily
+           drivers, the most used models of the cheap (<$0.30/1M) and mid
+           ($0.30–$0.80/1M) tier plus their best value, and one or two strong
+           models on top (best under $2.00 and under $3.50). Traffic comes from
+           the OpenRouter usage dataset of the last 7 days.
+
+  newest   strictly by release date: the N newest models (`created` timestamp).
+           Useful to try fresh releases, useless for a stable setup.
 
 Outputs (into ./goose):
   openrouter_code.json     -> copy to ~/.config/goose/custom_providers/
@@ -13,7 +24,11 @@ Outputs (into ./goose):
   config.snippet.yaml      -> providers: entry to merge into config.yaml
   README.md                -> setup instructions
 
-Usage: python generate_goose_config.py [--api-key KEY] [--out DIR]
+Usage:
+  python generate_goose_config.py [--api-key KEY] [--out DIR]
+  python generate_goose_config.py --verify                     # default mode
+  python generate_goose_config.py --mode newest --newest 5
+  python generate_goose_config.py --also z-ai/glm-5.3-flash    # keep a favourite
 """
 
 import argparse
@@ -21,10 +36,12 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
 MODELS_API = "https://openrouter.ai/api/v1/models"
+CHAT_API = "https://openrouter.ai/api/v1/chat/completions"
 RANKINGS_API = "https://openrouter.ai/api/v1/datasets/rankings-daily"
 REPO_RAW_URL = "https://raw.githubusercontent.com/pcace/openrouter-ranking/main/goose"
 
@@ -34,21 +51,29 @@ API_KEY_ENV = "OPENROUTER_API_KEY"
 BASE_URL = "https://openrouter.ai/api/v1"
 
 MIN_CONTEXT = 128_000
-MAX_MODELS = 10
 USAGE_WINDOW_DAYS = 7
 
-# Models to keep if they still qualify — the user's current favourites.
-PINNED = ["deepseek/deepseek-v4.1-flash", "z-ai/glm-5.3"]
+# --- selection knobs --------------------------------------------------------
+SELECTION_MODE = "curated"   # "curated" (default) | "newest"
+NEWEST_COUNT = 5             # models in newest mode
 
-# Price tiers (USD per 1M blended tokens) and how many to pick from each.
-TIERS = [("cheap", 0.0, 0.20, 3), ("mid", 0.20, 0.80, 3)]
-PREMIUM_MAX = 5.0  # best-quality pick must stay under this $/1M
+# The curated list is affordable and follows what people actually run on
+# OpenRouter, with one or two strong models on top. USD per 1M blended tokens.
+MAX_MODELS = 9               # total size of the list
+CHEAP_TIER = (0.0, 0.30)     # "cheap": DeepSeek Flash / GLM Flash territory
+MID_TIER = (0.30, 0.80)
+CHEAP_CROWD, CHEAP_VALUE = 2, 1
+MID_CROWD, MID_VALUE = 1, 1
+QUALITY_CAPS = (2.00, 3.50)  # one strong model per cap: solid + the best affordable
 MAX_PER_ORG = 2
+
+# Kept regardless of price tiers — the models you run every day.
+PINNED = ["deepseek/deepseek-v4.1-flash", "z-ai/glm-5.3-flash"]
 
 PATRONYM = {  # org -> pretty label for the alias
     "deepseek": "DeepSeek", "z-ai": "GLM", "qwen": "Qwen", "openai": "OpenAI",
     "anthropic": "Claude", "google": "Gemini", "x-ai": "Grok", "moonshotai": "Kimi",
-    "meta": "Llama", "mistralai": "Mistral", "minimax": "MiniMax", "tencent": "Hunyuan",
+    "mistralai": "Mistral", "minimax": "MiniMax", "tencent": "Hunyuan",
     "stepfun": "StepFun", "xiaomi": "MiMo", "upstage": "Solar", "inclusionai": "Ling",
 }
 
@@ -130,7 +155,7 @@ def build_index(models):
             prompt, completion = float(p.get("prompt", 0)), float(p.get("completion", 0))
         except (TypeError, ValueError):
             continue
-        if prompt <= 0 or completion <= 0:
+        if prompt < 0 or completion < 0:
             continue
         aa = (m.get("benchmarks") or {}).get("artificial_analysis") or {}
         cid = canonical_id(mid)
@@ -146,7 +171,9 @@ def build_index(models):
         entry = {
             "cid": cid,
             "id": mid, "api_name": m["name"], "context": m.get("context_length", 0),
+            "created": int(m.get("created") or 0),
             "prompt_cost": prompt, "completion_cost": completion, "cost_1m": cost,
+            "free": prompt == 0 and completion == 0,
             "coding": aa.get("coding_index"), "intelligence": aa.get("intelligence_index"),
             "tools": "tools" in (m.get("supported_parameters") or []),
             "reasoning": bool(m.get("reasoning")),
@@ -199,61 +226,185 @@ def humanize_tokens(n):
     return str(n)
 
 
-def select(models, usage):
-    """Pick ≤ MAX_MODELS coding models: pinned + best value per tier + best quality + popular."""
+def select(models, usage, total=0, api_key=None, verify=False):
+    """Affordable models people actually run, with one or two strong ones on top.
+
+    Slot by slot, in priority order:
+
+      1. PINNED    — your daily drivers, always kept
+      2. cheap tier (below $0.30/1M) — the models with the most traffic, then
+                     the best value (coding score per dollar)
+      3. mid tier ($0.30–$0.80/1M) — one by traffic, one by value
+      4. quality   — the best scoring model under $2.00 and under $3.50
+
+    Every slot falls through to the next candidate when a model is already in
+    the list, breaks MAX_PER_ORG, or — with `verify` — cannot be reached by this
+    account (e.g. excluded by a zero-data-retention rule).
+    """
     def qualifies(m):
-        return m["tools"] and m["context"] >= MIN_CONTEXT and (
-            m["coding"] is not None or m["intelligence"] is not None)
+        return (m["tools"] and m["context"] >= MIN_CONTEXT and m["cost_1m"] > 0
+                and (m["coding"] is not None or m["intelligence"] is not None))
 
     def score(m):
         return m["coding"] if m["coding"] is not None else (m["intelligence"] or 0)
 
+    def value(m):
+        return score(m) / m["cost_1m"]
+
+    def used(m):
+        return usage.get(m["cid"], 0)
+
+    def traffic(m):
+        share = f" · {100 * used(m) / total:.1f}%" if total else ""
+        return f" · {humanize_tokens(used(m))} tok/{USAGE_WINDOW_DAYS}d{share}"
+
     pool = [m for m in models.values() if qualifies(m)]
-    value = lambda m: score(m) / m["cost_1m"]
+    chosen, why = [], {}
 
-    chosen, why = {}, {}
+    def take(candidates, reason, slots=1, diversify=True):
+        """Fill `slots` from `candidates` in the given order."""
+        filled = 0
+        for m in candidates:
+            if filled >= slots or len(chosen) >= MAX_MODELS:
+                return
+            if any(c["cid"] == m["cid"] for c in chosen):
+                continue
+            if diversify and sum(1 for c in chosen if org_of(c["id"]) == org_of(m["id"])) >= MAX_PER_ORG:
+                continue
+            if verify and api_key and not probe_available(m, api_key):
+                continue
+            chosen.append(m)
+            why[m["id"]] = reason(m)
+            filled += 1
 
-    def take(m, reason, diversify=True):
-        if not m or m["id"] in chosen:
-            return False
-        if diversify and sum(1 for c in chosen.values() if org_of(c["id"]) == org_of(m["id"])) >= MAX_PER_ORG:
-            return False
-        chosen[m["id"]] = m
-        why[m["id"]] = reason
+    pinned = []
+    for pid in PINNED:
+        m = next((x for x in pool if x["cid"] == pid or x["id"] == pid), None)
+        if m:
+            pinned.append(m)
+    take(pinned, lambda m: "your daily driver" + traffic(m), slots=len(pinned), diversify=False)
+
+    for (lo, hi), crowd_slots, value_slots, label in (
+            (CHEAP_TIER, CHEAP_CROWD, CHEAP_VALUE, "cheap"),
+            (MID_TIER, MID_CROWD, MID_VALUE, "mid")):
+        tier = [m for m in pool if lo <= m["cost_1m"] < hi]
+        take(sorted((m for m in tier if used(m)), key=used, reverse=True),
+             lambda m, l=label: f"{l} tier, most traffic" + traffic(m), slots=crowd_slots)
+        # a cheap gem nobody runs is a risk; prefer the used ones when we know
+        # the traffic (i.e. an API key was available)
+        in_use = [m for m in tier if used(m)]
+        take(sorted(in_use or tier, key=value, reverse=True),
+             lambda m, l=label, lo=lo, hi=hi: f"best {l}-tier value (${lo:.2f}–${hi:.2f}/1M)",
+             slots=value_slots)
+
+    for cap in QUALITY_CAPS:
+        take(sorted((m for m in pool if m["cost_1m"] <= cap), key=score, reverse=True),
+             lambda m, c=cap: f"best quality under ${c:.2f}/1M (score {score(m):.0f})",
+             slots=1, diversify=False)
+
+    return sorted(chosen, key=lambda m: m["cost_1m"]), why
+
+
+def fmt_date(ts):
+    return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d") if ts else "unknown"
+
+
+def probe_available(model, api_key, timeout=60):
+    """One-token completion: is any endpoint of this model usable for this account?
+
+    OpenRouter answers 404 when every endpoint is filtered out by the account's
+    data policy (e.g. a zero-data-retention requirement), and the catalog does
+    not expose those policies — so a real request is the only reliable check.
+    """
+    payload = json.dumps({
+        "model": model["id"],
+        "messages": [{"role": "user", "content": "."}],
+        "max_tokens": 1,
+    }).encode()
+    req = urllib.request.Request(CHAT_API, data=payload, headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "User-Agent": "openrouter-ranking/goose-config",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status == 200
+    except urllib.error.HTTPError as e:
+        if e.code == 429:  # throttled, but the model itself works
+            return True
+        print(f"   ✗ skipping {model['id']}: HTTP {e.code}", file=sys.stderr)
+        return False
+    except Exception as e:  # network hiccup — keep the model
+        print(f"   ? could not probe {model['id']} ({e}); keeping it", file=sys.stderr)
         return True
 
-    for pid in PINNED:
-        cand = next((m for m in models.values()
-                     if qualifies(m) and (canonical_id(m["id"]) == pid or m["id"] == pid)), None)
-        take(cand, "your current model", diversify=False)
 
-    for name, lo, hi, n in TIERS:
-        taken = 0
-        for m in sorted((m for m in pool if lo <= m["cost_1m"] < hi), key=value, reverse=True):
-            if taken >= n:
-                break
-            if take(m, f"best {name}-tier value (${lo:.2f}–${hi:.2f}/1M)"):
-                taken += 1
+def select_newest(models, count=NEWEST_COUNT, api_key=None, verify=False, include_free=False,
+                  also=()):
+    """Pick the `count` most recently released models.
 
-    premium = [m for m in pool if m["cost_1m"] <= PREMIUM_MAX]
-    if premium:
-        take(max(premium, key=score), f"best quality under ${PREMIUM_MAX:.0f}/1M", diversify=False)
+    `created` is the release timestamp OpenRouter exposes per model, so this
+    follows the catalog itself instead of any judgement of quality. Filtered
+    out, because they would only waste a slot in a Goose picker:
 
-    for m in sorted((m for m in pool if m["cid"] in usage),
-                    key=lambda m: usage[m["cid"]], reverse=True)[:3]:
-        take(m, f"widely used ({humanize_tokens(usage[m['cid']])} tok/7d)")
+      - models without tool calling — Goose cannot run a session on them;
+      - non-interactive/duplicate entries — `:batch` endpoints are folded into
+        their interactive sibling by build_index(), `~` rolling aliases are
+        dropped there as well;
+      - `:free` promos (`--include-free` to keep them): rate limited, and often
+        the only model whose single endpoint is excluded by an account's data
+        policy;
+      - optionally anything a probe shows as unusable for this account
+        (`--verify`), in which case the next-newest model takes the slot.
 
-    take(max(pool, key=value), "best overall coding value", diversify=False)
+    `also` names models that are kept on top of the newest ones, so a personal
+    favourite that is months old does not get squeezed out by the release race.
+    """
+    def usable(m):
+        return m["tools"] and m["context"] > 0 and (include_free or not m["free"])
 
-    return sorted(chosen.values(), key=lambda m: m["cost_1m"])[:MAX_MODELS], why
+    pool = sorted((m for m in models.values() if usable(m)),
+                  key=lambda m: m["created"], reverse=True)
+
+    pinned = []
+    for want in also:
+        m = next((x for x in models.values() if x["id"] == want), None) or \
+            next((x for x in models.values() if x["cid"] == canonical_id(want)), None)
+        if not m or not m["tools"]:
+            print(f"⚠️  --also {want}: unknown model or no tool support, skipped", file=sys.stderr)
+            continue
+        if m["id"] not in {x["id"] for x in pinned}:
+            pinned.append(m)
+
+    chosen = []
+    for m in pool:
+        if len(chosen) >= count:
+            break
+        if m["id"] in {x["id"] for x in pinned}:
+            continue  # already in the list, do not burn a newest-slot on it
+        if verify and api_key and not probe_available(m, api_key):
+            continue
+        chosen.append(m)
+
+    why = {m["id"]: f"newest release on OpenRouter ({fmt_date(m['created'])})" for m in chosen}
+    for m in pinned:
+        why[m["id"]] = f"kept via --also (released {fmt_date(m['created'])})"
+    return chosen + pinned, why
 
 
-def provider_json(models):
+def provider_json(models, mode=SELECTION_MODE):
+    if mode == "newest":
+        display_name = "OpenRouter · Newest"
+        description = f"The {len(models)} newest OpenRouter models, regenerated automatically."
+    else:
+        display_name = "OpenRouter · Best Value"
+        description = ("Affordable, widely used OpenRouter models — cheap value picks "
+                       "plus one or two strong ones.")
     return {
         "name": PROVIDER_ID,
         "engine": "openai",
-        "display_name": PROVIDER_DISPLAY,
-        "description": "Curated OpenRouter coding models, regenerated weekly.",
+        "display_name": display_name,
+        "description": description,
         "api_key_env": API_KEY_ENV,
         "base_url": BASE_URL,
         "models": [
@@ -295,7 +446,8 @@ def modality_tags(m):
 def predefined_models(models, usage, total):
     out = []
     for m in models:
-        parts = [f"${m['cost_1m']:.2f}/1M", f"{fmt_ctx(m['context'])} ctx"]
+        price = "free" if m["free"] else f"${m['cost_1m']:.2f}/1M"
+        parts = [price, f"{fmt_ctx(m['context'])} ctx"]
         if m["coding"] is not None:
             parts.append(f"code {m['coding']:.0f}")
         elif m["intelligence"] is not None:
@@ -319,24 +471,50 @@ def predefined_models(models, usage, total):
     return out
 
 
-def write_readme(out_dir, selected, why, now, usage, total):
+def write_readme(out_dir, selected, why, now, usage, total, mode=SELECTION_MODE):
     def row(m):
         alias = pretty_alias(m["id"], m["api_name"])
+        cost = "free" if m["free"] else f"${m['cost_1m']:.2f}"
         code = f"{m['coding']:.0f}" if m["coding"] is not None else "n/a"
         tokens = usage.get(m["cid"])
         used = f"{humanize_tokens(tokens)} ({100 * tokens / total:.1f}%)" if tokens else "—"
-        return (f"| `{m['id']}` | {alias} | ${m['cost_1m']:.2f} | {code} | "
-                f"{m['context']:,} | {used} | {modality_tags(m) or 'text'} | {why.get(m['id'], '')} |")
+        common = (f"| `{m['id']}` | {alias} | {fmt_date(m['created'])} | {cost} | "
+                  f"{m['context']:,} | {modality_tags(m) or 'text'} |")
+        if mode == "newest":
+            return f"{common} {why.get(m['id'], '')} |"
+        return f"{common} {code} | {used} | {why.get(m['id'], '')} |"
 
     rows = "\n".join(row(m) for m in selected)
-    readme = f"""# Goose config — OpenRouter coding models
 
-Generated **{now}**. {len(selected)} models, selected from the live OpenRouter
-catalog by coding score, price and real usage. Token figures are the last
-{USAGE_WINDOW_DAYS} days (share of all OpenRouter traffic in the window).
+    if mode == "newest":
+        headline = f"the **{len(selected)} newest models** on OpenRouter"
+        intro = ("Selection follows the catalog, not a curation: the models with the latest\n"
+                 "`created` timestamp win, so any release that lands on OpenRouter moves in on\n"
+                 "the next run. Skipped: models without tool calling (Goose cannot run a\n"
+                 "session on them), non-interactive `:batch` endpoints, and `:free` promos\n"
+                 "(`--include-free` keeps them). With `--verify` each candidate is probed with a\n"
+                 "1-token request, so models your account cannot use — e.g. excluded by a\n"
+                 "zero-data-retention setting — make room for the next-newest one. Sorted\n"
+                 "newest first.")
+        cols = "| Model | Name in picker | Released | $/1M | Context | In | Why |\n"
+        cols += "|-------|----------------|----------|------|---------|----|-----|"
+    else:
+        headline = f"{len(selected)} affordable, widely used models"
+        intro = ("Not the newest, not the priciest: cheap value picks first, then the models\n"
+                 "OpenRouter users actually spend tokens on, then one or two strong models on top\n"
+                 "(best under $2.00 and under $3.50 per 1M tokens). With `--verify` every\n"
+                 "candidate is probed with a 1-token request, so models your account cannot reach\n"
+                 f"are replaced instead of parked in the picker. Token figures: last {USAGE_WINDOW_DAYS}\n"
+                 "days (share of all OpenRouter traffic in the window).")
+        cols = "| Model | Name in picker | Released | $/1M | Context | In | Coding | Tokens (7d) | Why |\n"
+        cols += "|-------|----------------|----------|------|---------|----|--------|-------------|-----|"
 
-| Model | Name in picker | $/1M | Coding | Context | Tokens (7d) | In | Why |
-|-------|----------------|------|--------|---------|-------------|----|-----|
+    readme = f"""# Goose config — OpenRouter models
+
+Generated **{now}**. Mode: **{mode}** — {headline}.
+{intro}
+
+{cols}
 {rows}
 
 ## Setup — new machine
@@ -352,7 +530,7 @@ self-updating launcher (`.desktop` on Linux, `launchctl` on macOS) and adds
 `GOOSE_PREDEFINED_MODELS` to your shell profile.
 
 **Start Goose afterwards via the desktop launcher** so the wrapper applies —
-the launcher re-downloads the latest model list on *every* start.
+the launcher refreshes the model list on *every* start.
 
 Then add the `{API_KEY_ENV}` secret in Goose (Settings → provider, or
 `goose configure`) — keys are never part of these files.
@@ -365,12 +543,19 @@ Then add the `{API_KEY_ENV}` secret in Goose (Settings → provider, or
 
 ## Update
 
-Nothing to do: the launcher pulls the latest list on every Goose start, and the
-GitHub Action regenerates it weekly (Monday 12:00 UTC). To force it:
+Nothing to do: the launcher refreshes the list on every Goose start — locally it
+re-runs `generate_goose_config.py`, otherwise it pulls the generated files — and
+the GitHub Action regenerates them weekly (Monday 12:00 UTC). To force it:
 
 ```bash
 bash "$HOME/.config/goose/launch-goose-with-models.sh"
 ```
+
+Knobs the launcher reads: `GOOSE_NEWEST_COUNT` (default `{NEWEST_COUNT}`),
+`GOOSE_MODEL_MODE` (`newest` or `curated`), `GOOSE_EXTRA_MODELS` (comma-separated
+models that stay in the list regardless of their release date, e.g.
+`z-ai/glm-5.3-flash`) and `GOOSE_MODEL_REFRESH_MIN` (default `360` — minutes
+before the local regeneration runs again).
 """
     with open(os.path.join(out_dir, "README.md"), "w") as f:
         f.write(readme)
@@ -381,17 +566,42 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--api-key", default=os.environ.get("OPENROUTER_API_KEY"))
     ap.add_argument("--out", default="goose")
+    ap.add_argument("--mode", choices=["newest", "curated"], default=SELECTION_MODE,
+                    help="newest = latest N releases from the catalog (default), "
+                         "curated = hand-tuned coding mix")
+    ap.add_argument("--newest", type=int, default=NEWEST_COUNT,
+                    help=f"how many models in newest mode (default {NEWEST_COUNT})")
+    ap.add_argument("--include-free", action="store_true",
+                    help="also consider ':free' promo variants (skipped by default)")
+    ap.add_argument("--also", action="append", default=[], metavar="MODEL",
+                    help="keep this model on top of the newest ones (repeatable), "
+                         "e.g. --also z-ai/glm-5.3-flash")
+    ap.add_argument("--verify", action="store_true",
+                    help="probe each candidate with a 1-token request and skip models "
+                         "this account cannot use (needs an API key)")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
     print("🔄 Fetching OpenRouter catalog…", file=sys.stderr)
     models = build_index(_get_json(MODELS_API)["data"])
-    usage, total = fetch_usage(args.api_key, models) if args.api_key else ({}, 0)
-    selected, why = select(models, usage)
-    print(f"✅ {len(selected)} models selected: {', '.join(m['id'] for m in selected)}", file=sys.stderr)
+    if args.mode == "newest":
+        # Usage data is only decoration in this mode; skipping it keeps the
+        # weekly run cheap (and works without an API key).
+        usage, total = {}, 0
+        if args.verify and not args.api_key:
+            print("⚠️  --verify needs an API key; picking without probing", file=sys.stderr)
+        selected, why = select_newest(models, args.newest, api_key=args.api_key,
+                                      verify=args.verify, include_free=args.include_free,
+                                      also=args.also)
+    else:
+        usage, total = fetch_usage(args.api_key, models) if args.api_key else ({}, 0)
+        selected, why = select(models, usage, total, api_key=args.api_key,
+                              verify=args.verify)
+    print(f"✅ {len(selected)} models selected ({args.mode}): "
+          f"{', '.join(m['id'] for m in selected)}", file=sys.stderr)
 
     with open(os.path.join(args.out, "openrouter_code.json"), "w") as f:
-        json.dump(provider_json(selected), f, indent=2)
+        json.dump(provider_json(selected, args.mode), f, indent=2)
         f.write("\n")
 
     pre = predefined_models(selected, usage, total)
@@ -404,7 +614,9 @@ def main():
     with open(os.path.join(args.out, "predefined_models.min.json"), "w") as f:
         f.write(json.dumps(pre, separators=(",", ":")))
 
-    first = selected[0]["id"]
+    # Default model: newest mode puts a free promo first on occasion — start on
+    # a paid entry instead so the first session is not rate limited.
+    first = next((m["id"] for m in selected if not m["free"]), selected[0]["id"])
     snippet = (
         "# merge under the top-level `providers:` key in ~/.config/goose/config.yaml\n"
         "providers:\n"
@@ -417,7 +629,7 @@ def main():
         f.write(snippet)
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    write_readme(args.out, selected, why, now, usage, total)
+    write_readme(args.out, selected, why, now, usage, total, args.mode)
     print(f"✅ Wrote {args.out}/ (provider, predefined models, snippet, README)", file=sys.stderr)
 
 
